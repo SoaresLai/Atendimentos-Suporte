@@ -105,6 +105,28 @@ const mockTickets: Ticket[] = [
     criadoPor: "Pedro Costa",
     criadoEm: "2024-01-11T11:30:00",
   },
+  {
+    id: 6,
+    empresa: "Futuro Solar",
+    plataforma: "INTERCOM",
+    departamento: "Suporte",
+    descricao: "Mensagem automática fim de expediente",
+    status: "Resolvido",
+    emImplementacao: false,
+    criadoPor: "João Silva",
+    criadoEm: "2024-01-10T09:00:00",
+  },
+  {
+    id: 7,
+    empresa: "MV2 Engenharia",
+    plataforma: "INTERCOM",
+    departamento: "Suporte",
+    descricao: "UpSell e DownSell",
+    status: "Em Andamento",
+    emImplementacao: true,
+    criadoPor: "João Silva",
+    criadoEm: "2024-01-09T14:30:00",
+  },
 ]
 
 const departamentos = [
@@ -123,7 +145,7 @@ export default function Dashboard() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [activeTab, setActiveTab] = useState("")
   const [tickets, setTickets] = useState<Ticket[]>(mockTickets)
-  const [filteredTickets, setFilteredTickets] = useState<Ticket[]>(mockTickets)
+  const [filteredTickets, setFilteredTickets] = useState<Ticket[]>([])
   const [userStats, setUserStats] = useState<UserStats | null>(null)
   const [loadingStats, setLoadingStats] = useState(false)
 
@@ -152,7 +174,7 @@ export default function Dashboard() {
     emImplementacao: false,
   })
 
-  // Adicionar após os outros estados
+  // Estados para edição e filtros
   const [editingTicket, setEditingTicket] = useState<number | null>(null)
   const [editStatus, setEditStatus] = useState<"Em Andamento" | "Resolvido" | "Pendente">("Em Andamento")
   const [selectedUserFilter, setSelectedUserFilter] = useState("")
@@ -168,9 +190,18 @@ export default function Dashboard() {
     }
   }, [])
 
-  // Aplicar filtros
+  // Aplicar filtros baseados no usuário e filtros selecionados
   useEffect(() => {
-    let filtered = tickets
+    if (!currentUser) return
+
+    // Primeiro, filtrar por usuário se for técnico
+    let baseTickets = tickets
+    if (currentUser.role === "Tecnico") {
+      baseTickets = tickets.filter((ticket) => ticket.criadoPor === currentUser.name)
+    }
+
+    // Depois aplicar os filtros adicionais
+    let filtered = baseTickets
 
     if (filters.empresa) {
       filtered = filtered.filter((ticket) => ticket.empresa.toLowerCase().includes(filters.empresa.toLowerCase()))
@@ -205,7 +236,7 @@ export default function Dashboard() {
     }
 
     setFilteredTickets(filtered)
-  }, [filters, tickets])
+  }, [filters, tickets, currentUser])
 
   // Carregar estatísticas do usuário
   const loadUserStats = async () => {
@@ -280,6 +311,7 @@ export default function Dashboard() {
     setCurrentUser(null)
     setIsLoggedIn(false)
     setActiveTab("")
+    setSelectedUserFilter("")
     localStorage.removeItem("currentUser")
   }
 
@@ -377,7 +409,9 @@ export default function Dashboard() {
     return emojis[dept] || "📋"
   }
 
-  // Cálculos das métricas gerais
+  // Cálculos das métricas gerais (baseado nos tickets visíveis para o usuário)
+  const visibleTickets =
+    currentUser?.role === "Supervisor" ? tickets : tickets.filter((t) => t.criadoPor === currentUser?.name)
   const totalAtendimentos = filteredTickets.length
   const resolvidos = filteredTickets.filter((t) => t.status === "Resolvido").length
   const naoResolvidos = filteredTickets.filter((t) => t.status !== "Resolvido").length
@@ -484,7 +518,11 @@ export default function Dashboard() {
               </div>
               <div>
                 <h1 className="text-xl font-bold text-gray-800">Sistema de Acompanhamento - Suporte</h1>
-                <p className="text-sm text-gray-600">Gerencie tickets e acompanhe métricas em tempo real</p>
+                <p className="text-sm text-gray-600">
+                  {currentUser?.role === "Supervisor"
+                    ? "Gerencie todos os tickets e acompanhe métricas em tempo real"
+                    : "Gerencie seus tickets e acompanhe suas métricas"}
+                </p>
               </div>
             </div>
 
@@ -514,10 +552,12 @@ export default function Dashboard() {
           <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-white/20">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Atendimentos</p>
+                <p className="text-sm font-medium text-gray-600">
+                  {currentUser?.role === "Supervisor" ? "Total Atendimentos" : "Meus Atendimentos"}
+                </p>
                 <p className="text-3xl font-bold text-gray-800">{totalAtendimentos}</p>
-                {filteredTickets.length !== tickets.length && (
-                  <p className="text-xs text-gray-500">{tickets.length} total</p>
+                {filteredTickets.length !== visibleTickets.length && (
+                  <p className="text-xs text-gray-500">{visibleTickets.length} total</p>
                 )}
               </div>
               <span className="text-3xl">📊</span>
@@ -633,7 +673,7 @@ export default function Dashboard() {
                     : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300",
                 )}
               >
-                📋 Lista de Tickets
+                📋 {currentUser?.role === "Supervisor" ? "Todos os Tickets" : "Meus Tickets"}
                 <span className="ml-2 bg-emerald-100 text-emerald-800 text-xs px-2 py-1 rounded-full">
                   {filteredTickets.length}
                 </span>
@@ -764,9 +804,14 @@ export default function Dashboard() {
             {activeTab === "tickets" && (
               <div>
                 <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-800">📋 Lista de Tickets</h2>
+                  <h2 className="text-2xl font-bold text-gray-800">
+                    📋 {currentUser?.role === "Supervisor" ? "Todos os Tickets" : "Meus Tickets"}
+                  </h2>
                   <div className="text-sm text-gray-600">
-                    Mostrando {filteredTickets.length} de {tickets.length} tickets
+                    Mostrando {filteredTickets.length} de {visibleTickets.length} tickets
+                    {currentUser?.role === "Tecnico" && (
+                      <span className="block text-xs text-emerald-600 mt-1">✨ Visualizando apenas seus tickets</span>
+                    )}
                   </div>
                 </div>
 
@@ -849,16 +894,19 @@ export default function Dashboard() {
                       />
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">👤 Criado Por</label>
-                      <input
-                        type="text"
-                        value={filters.criadoPor}
-                        onChange={(e) => setFilters({ ...filters, criadoPor: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
-                        placeholder="Nome do usuário..."
-                      />
-                    </div>
+                    {/* Campo "Criado Por" apenas para supervisores */}
+                    {currentUser?.role === "Supervisor" && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">👤 Criado Por</label>
+                        <input
+                          type="text"
+                          value={filters.criadoPor}
+                          onChange={(e) => setFilters({ ...filters, criadoPor: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
+                          placeholder="Nome do usuário..."
+                        />
+                      </div>
+                    )}
 
                     <div className="flex items-end">
                       <label className="flex items-center">
@@ -906,7 +954,9 @@ export default function Dashboard() {
                             <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded">
                               {getDepartmentEmoji(ticket.departamento)} {ticket.departamento}
                             </span>
-                            <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded">👤 {ticket.criadoPor}</span>
+                            {currentUser?.role === "Supervisor" && (
+                              <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded">👤 {ticket.criadoPor}</span>
+                            )}
                             <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded">
                               📅 {new Date(ticket.criadoEm).toLocaleDateString("pt-BR")}
                             </span>
@@ -983,8 +1033,16 @@ export default function Dashboard() {
                   {filteredTickets.length === 0 && (
                     <div className="text-center py-12">
                       <div className="text-6xl mb-4">🔍</div>
-                      <h3 className="text-lg font-medium text-gray-800 mb-2">Nenhum ticket encontrado</h3>
-                      <p className="text-gray-600">Tente ajustar os filtros para encontrar tickets.</p>
+                      <h3 className="text-lg font-medium text-gray-800 mb-2">
+                        {currentUser?.role === "Supervisor"
+                          ? "Nenhum ticket encontrado"
+                          : "Você ainda não criou tickets"}
+                      </h3>
+                      <p className="text-gray-600">
+                        {currentUser?.role === "Supervisor"
+                          ? "Tente ajustar os filtros para encontrar tickets."
+                          : "Crie seu primeiro ticket na aba 'Novo Ticket'."}
+                      </p>
                     </div>
                   )}
                 </div>
