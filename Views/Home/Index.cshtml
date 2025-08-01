@@ -1,0 +1,248 @@
+@model SupportDashboard.Models.DashboardViewModel
+@{
+    ViewData["Title"] = "Dashboard de Suporte";
+}
+
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="text-center mb-5">
+        <h1 class="display-4 fw-bold text-dark">Sistema de Acompanhamento - Suporte</h1>
+        <p class="lead text-muted">Gerencie tickets e acompanhe métricas em tempo real</p>
+    </div>
+
+    <!-- Success Message -->
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            @TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <!-- Dashboard de Métricas -->
+    <div class="row g-4 mb-5">
+        <div class="col-md-3">
+            <div class="metric-card bg-primary">
+                <div class="metric-icon">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="metric-content">
+                    <h3>@Model.Metrics.TotalAtendimentos</h3>
+                    <p>Total Atendimentos</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-card bg-success">
+                <div class="metric-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="metric-content">
+                    <h3>@Model.Metrics.Resolvidos</h3>
+                    <p>Resolvidos</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-card bg-danger">
+                <div class="metric-icon">
+                    <i class="fas fa-exclamation-circle"></i>
+                </div>
+                <div class="metric-content">
+                    <h3>@Model.Metrics.NaoResolvidos</h3>
+                    <p>Não Resolvidos</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-card bg-info">
+                <div class="metric-icon">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <div class="metric-content">
+                    <h3>@Model.Metrics.TaxaConclusao%</h3>
+                    <p>Taxa de Conclusão</p>
+                    <div class="progress mt-2">
+                        <div class="progress-bar" style="width: @Model.Metrics.TaxaConclusao%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Balanços por Plataforma -->
+    <div class="row g-4 mb-5">
+        <div class="col-md-4">
+            <div class="platform-card">
+                <h4>Intercom</h4>
+                <div class="platform-count text-primary">@Model.Metrics.Intercom</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="platform-card">
+                <h4>GronerZap</h4>
+                <div class="platform-count text-success">@Model.Metrics.GronerZap</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="platform-card">
+                <h4>Em Implementação</h4>
+                <div class="platform-count text-warning">@Model.Metrics.EmImplementacao</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Departamentos -->
+    <div class="card glass-card mb-5">
+        <div class="card-header">
+            <h4><i class="fas fa-building me-2"></i>Distribuição por Departamento</h4>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                @foreach (var dept in Model.Metrics.ContadorDepartamentos)
+                {
+                    <div class="col-md-3">
+                        <div class="dept-card">
+                            <div class="dept-name">@dept.Key.ToString()</div>
+                            <div class="dept-count">@dept.Value</div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <ul class="nav nav-tabs mb-4" id="mainTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="form-tab" data-bs-toggle="tab" data-bs-target="#form-pane" type="button">
+                <i class="fas fa-plus me-2"></i>Novo Ticket
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="list-tab" data-bs-toggle="tab" data-bs-target="#list-pane" type="button">
+                <i class="fas fa-list me-2"></i>Lista de Tickets
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="mainTabsContent">
+        <!-- Formulário -->
+        <div class="tab-pane fade show active" id="form-pane">
+            <div class="card glass-card">
+                <div class="card-header">
+                    <h4><i class="fas fa-plus me-2"></i>Cadastrar Novo Ticket</h4>
+                    <p class="text-muted mb-0">Preencha as informações para adicionar um novo ticket ao sistema</p>
+                </div>
+                <div class="card-body">
+                    <form asp-action="AdicionarTicket" method="post">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label asp-for="NovoTicket.Empresa" class="form-label"></label>
+                                <input asp-for="NovoTicket.Empresa" class="form-control" placeholder="Nome da empresa" />
+                                <span asp-validation-for="NovoTicket.Empresa" class="text-danger"></span>
+                            </div>
+                            <div class="col-md-6">
+                                <label asp-for="NovoTicket.Plataforma" class="form-label"></label>
+                                <select asp-for="NovoTicket.Plataforma" class="form-select" asp-items="Html.GetEnumSelectList<SupportDashboard.Models.Plataforma>()">
+                                    <option value="">Selecione uma plataforma</option>
+                                </select>
+                                <span asp-validation-for="NovoTicket.Plataforma" class="text-danger"></span>
+                            </div>
+                            <div class="col-md-6">
+                                <label asp-for="NovoTicket.Departamento" class="form-label"></label>
+                                <select asp-for="NovoTicket.Departamento" class="form-select" asp-items="Html.GetEnumSelectList<SupportDashboard.Models.Departamento>()">
+                                    <option value="">Selecione um departamento</option>
+                                </select>
+                                <span asp-validation-for="NovoTicket.Departamento" class="text-danger"></span>
+                            </div>
+                            <div class="col-md-6">
+                                <label asp-for="NovoTicket.Status" class="form-label"></label>
+                                <select asp-for="NovoTicket.Status" class="form-select" asp-items="Html.GetEnumSelectList<SupportDashboard.Models.StatusTicket>()">
+                                    <option value="">Selecione um status</option>
+                                </select>
+                                <span asp-validation-for="NovoTicket.Status" class="text-danger"></span>
+                            </div>
+                            <div class="col-12">
+                                <div class="form-check">
+                                    <input asp-for="NovoTicket.Importante" class="form-check-input" />
+                                    <label asp-for="NovoTicket.Importante" class="form-check-label"></label>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <label asp-for="NovoTicket.Assunto" class="form-label"></label>
+                                <textarea asp-for="NovoTicket.Assunto" class="form-control" rows="3" placeholder="Descreva o assunto do ticket"></textarea>
+                                <span asp-validation-for="NovoTicket.Assunto" class="text-danger"></span>
+                            </div>
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-primary btn-lg w-100">
+                                    <i class="fas fa-plus me-2"></i>Adicionar Ticket
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lista -->
+        <div class="tab-pane fade" id="list-pane">
+            <div class="card glass-card">
+                <div class="card-header">
+                    <h4><i class="fas fa-list me-2"></i>Lista de Tickets</h4>
+                    <p class="text-muted mb-0">Visualize e gerencie todos os tickets cadastrados</p>
+                </div>
+                <div class="card-body">
+                    @if (Model.Tickets.Any())
+                    {
+                        <div class="row g-4">
+                            @foreach (var ticket in Model.Tickets)
+                            {
+                                <div class="col-12">
+                                    <div class="ticket-card">
+                                        <div class="ticket-header">
+                                            <div>
+                                                <h5 class="ticket-company">@ticket.Empresa</h5>
+                                                <p class="ticket-subject">@ticket.Assunto</p>
+                                            </div>
+                                            <div class="ticket-badges">
+                                                @if (ticket.Importante)
+                                                {
+                                                    <span class="badge bg-danger">Importante</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary">Normal</span>
+                                                }
+                                                <span class="badge @(ticket.Status == SupportDashboard.Models.StatusTicket.Resolvido ? "bg-success" : "bg-warning")">
+                                                    @ticket.Status.ToString()
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="ticket-footer">
+                                            <span><i class="fas fa-desktop me-1"></i>@ticket.Plataforma</span>
+                                            <span><i class="fas fa-users me-1"></i>@ticket.Departamento</span>
+                                            <span><i class="fas fa-clock me-1"></i>@ticket.DataCriacao.ToString("dd/MM/yyyy HH:mm")</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-5">
+                            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">Nenhum ticket encontrado</h5>
+                            <p class="text-muted">Adicione o primeiro ticket usando o formulário acima.</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
