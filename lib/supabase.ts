@@ -13,8 +13,11 @@ export interface User {
   role: "Supervisor" | "Tecnico"
   department: string
   password_hash: string
+  is_active: boolean
   created_at: string
   updated_at: string
+  deleted_at?: string
+  deleted_by?: string
 }
 
 export interface Ticket {
@@ -34,7 +37,12 @@ export interface Ticket {
 // Funções para usuários
 export const userService = {
   async validateUser(username: string, password: string) {
-    const { data, error } = await supabase.from("users").select("*").eq("username", username).single()
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("username", username)
+      .eq("is_active", true)
+      .single()
 
     if (error || !data) return null
 
@@ -55,11 +63,33 @@ export const userService = {
   async getAllUsers() {
     const { data, error } = await supabase
       .from("users")
-      .select("id, username, name, role, department, created_at")
+      .select("id, username, name, role, department, created_at, is_active")
+      .eq("is_active", true)
       .order("name")
 
     if (error) throw error
     return data || []
+  },
+
+  async getAllUsersIncludingInactive() {
+    const { data, error } = await supabase
+      .from("users")
+      .select("id, username, name, role, department, created_at, is_active, deleted_at, deleted_by")
+      .order("name")
+
+    if (error) throw error
+    return data || []
+  },
+
+  async getUserById(id: number) {
+    const { data, error } = await supabase
+      .from("users")
+      .select("id, username, name, role, department, created_at, is_active")
+      .eq("id", id)
+      .single()
+
+    if (error) throw error
+    return data
   },
 
   async createUser(userData: {
@@ -80,6 +110,7 @@ export const userService = {
           role: userData.role,
           department: userData.department,
           password_hash: passwordHash,
+          is_active: true,
         },
       ])
       .select()
@@ -89,8 +120,59 @@ export const userService = {
     return data
   },
 
-  async checkUsernameExists(username: string) {
-    const { data, error } = await supabase.from("users").select("id").eq("username", username).single()
+  async updateUser(
+    id: number,
+    userData: {
+      username?: string
+      name?: string
+      role?: "Supervisor" | "Tecnico"
+      department?: string
+      password?: string
+    },
+  ) {
+    const updateData: any = {
+      updated_at: new Date().toISOString(),
+    }
+
+    if (userData.username) updateData.username = userData.username
+    if (userData.name) updateData.name = userData.name
+    if (userData.role) updateData.role = userData.role
+    if (userData.department) updateData.department = userData.department
+    if (userData.password) {
+      updateData.password_hash = btoa(userData.password + "SaltKey2024")
+    }
+
+    const { data, error } = await supabase.from("users").update(updateData).eq("id", id).select().single()
+
+    if (error) throw error
+    return data
+  },
+
+  async deleteUser(id: number, deletedBy: string) {
+    const { error } = await supabase.rpc("soft_delete_user", {
+      user_id: id,
+      deleted_by_name: deletedBy,
+    })
+
+    if (error) throw error
+  },
+
+  async reactivateUser(id: number) {
+    const { error } = await supabase.rpc("reactivate_user", {
+      user_id: id,
+    })
+
+    if (error) throw error
+  },
+
+  async checkUsernameExists(username: string, excludeId?: number) {
+    let query = supabase.from("users").select("id").eq("username", username).eq("is_active", true)
+
+    if (excludeId) {
+      query = query.neq("id", excludeId)
+    }
+
+    const { data, error } = await query.single()
 
     return !error && data
   },
@@ -111,6 +193,22 @@ export const ticketService = {
       .select("*")
       .eq("criado_por", userName)
       .order("criado_em", { ascending: false })
+
+    if (error) throw error
+    return data || []
+  },
+
+  async getTodaysTickets() {
+    const today = new Date()
+    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString()
+    const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString()
+
+    const { data, error } = await supabase
+      .from("tickets")
+      .select("*")
+      .gte("criado_em", startOfDay)
+      .lt("criado_em", endOfDay)
+      .order("criado_em", { ascending: true }) // Invertido: mais antigos primeiro
 
     if (error) throw error
     return data || []

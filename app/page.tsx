@@ -16,6 +16,10 @@ interface User {
   name: string
   role: "Supervisor" | "Tecnico"
   department: string
+  is_active?: boolean
+  created_at?: string
+  deleted_at?: string
+  deleted_by?: string
 }
 
 interface Ticket {
@@ -138,6 +142,19 @@ export default function Dashboard() {
   })
   const [addUserError, setAddUserError] = useState("")
 
+  // Estados para editar usuário
+  const [showEditUserModal, setShowEditUserModal] = useState(false)
+  const [editingUser, setEditingUser] = useState<User | null>(null)
+  const [editUserForm, setEditUserForm] = useState({
+    username: "",
+    name: "",
+    role: "Tecnico" as "Supervisor" | "Tecnico",
+    department: "",
+    password: "",
+    confirmPassword: "",
+  })
+  const [editUserError, setEditUserError] = useState("")
+
   // Verificar login salvo
   useEffect(() => {
     const savedUser = localStorage.getItem("currentUser")
@@ -174,7 +191,10 @@ export default function Dashboard() {
   // Carregar usuários
   const loadUsers = async () => {
     try {
-      const data = await userService.getAllUsers()
+      const data =
+        currentUser?.role === "Supervisor"
+          ? await userService.getAllUsersIncludingInactive()
+          : await userService.getAllUsers()
       setUsers(data)
     } catch (error) {
       console.error("Erro ao carregar usuários:", error)
@@ -232,11 +252,129 @@ export default function Dashboard() {
     }
   }
 
-  // Função para fechar modal
+  // Função para editar usuário
+  const handleEditUser = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setEditUserError("")
+
+    if (!editingUser) return
+
+    // Validações
+    if (editUserForm.password && editUserForm.password !== editUserForm.confirmPassword) {
+      setEditUserError("As senhas não coincidem")
+      return
+    }
+
+    if (editUserForm.password && editUserForm.password.length < 6) {
+      setEditUserError("A senha deve ter pelo menos 6 caracteres")
+      return
+    }
+
+    try {
+      const usernameExists = await userService.checkUsernameExists(editUserForm.username, editingUser.id)
+      if (usernameExists) {
+        setEditUserError("Nome de usuário já existe")
+        return
+      }
+
+      const updateData: any = {
+        username: editUserForm.username,
+        name: editUserForm.name,
+        role: editUserForm.role,
+        department: editUserForm.department,
+      }
+
+      if (editUserForm.password) {
+        updateData.password = editUserForm.password
+      }
+
+      await userService.updateUser(editingUser.id, updateData)
+
+      // Recarregar lista de usuários
+      await loadUsers()
+
+      // Fechar modal
+      setShowEditUserModal(false)
+      setEditingUser(null)
+      alert("Usuário atualizado com sucesso!")
+    } catch (error) {
+      console.error("Erro ao editar usuário:", error)
+      setEditUserError("Erro ao editar usuário")
+    }
+  }
+
+  // Função para excluir usuário
+  const handleDeleteUser = async (user: User) => {
+    if (!currentUser || currentUser.role !== "Supervisor") return
+
+    if (user.id === currentUser.id) {
+      alert("Você não pode excluir seu próprio usuário!")
+      return
+    }
+
+    if (confirm(`Tem certeza que deseja excluir o usuário "${user.name}"?`)) {
+      try {
+        await userService.deleteUser(user.id, currentUser.name)
+        await loadUsers()
+        alert("Usuário excluído com sucesso!")
+      } catch (error) {
+        console.error("Erro ao excluir usuário:", error)
+        alert("Erro ao excluir usuário")
+      }
+    }
+  }
+
+  // Função para reativar usuário
+  const handleReactivateUser = async (user: User) => {
+    if (!currentUser || currentUser.role !== "Supervisor") return
+
+    if (confirm(`Tem certeza que deseja reativar o usuário "${user.name}"?`)) {
+      try {
+        await userService.reactivateUser(user.id)
+        await loadUsers()
+        alert("Usuário reativado com sucesso!")
+      } catch (error) {
+        console.error("Erro ao reativar usuário:", error)
+        alert("Erro ao reativar usuário")
+      }
+    }
+  }
+
+  // Função para abrir modal de edição
+  const openEditUserModal = (user: User) => {
+    setEditingUser(user)
+    setEditUserForm({
+      username: user.username,
+      name: user.name,
+      role: user.role,
+      department: user.department,
+      password: "",
+      confirmPassword: "",
+    })
+    setEditUserError("")
+    setShowEditUserModal(true)
+  }
+
+  // Função para fechar modal de adição
   const closeAddUserModal = () => {
     setShowAddUserModal(false)
     setAddUserError("")
     setNewUser({
+      username: "",
+      name: "",
+      role: "Tecnico",
+      department: "",
+      password: "",
+      confirmPassword: "",
+    })
+  }
+
+  // Função para fechar modal de edição
+  const closeEditUserModal = () => {
+    setShowEditUserModal(false)
+    setEditUserError("")
+    setEditingUser(null)
+    setEditUserForm({
       username: "",
       name: "",
       role: "Tecnico",
@@ -733,7 +871,7 @@ export default function Dashboard() {
                 >
                   👥 Usuários
                   <span className="ml-2 bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full">
-                    {users.length}
+                    {users.filter((u) => u.is_active !== false).length}
                   </span>
                 </button>
               )}
@@ -1090,7 +1228,7 @@ export default function Dashboard() {
                         >
                           <option value="">Todos os tickets</option>
                           {users
-                            .filter((u) => u.role === "Tecnico")
+                            .filter((u) => u.role === "Tecnico" && u.is_active !== false)
                             .map((user) => (
                               <option key={user.id} value={user.name}>
                                 {user.name}
@@ -1298,7 +1436,12 @@ export default function Dashboard() {
             {/* Tab: Usuários (apenas para Supervisor) */}
             {activeTab === "usuarios" && currentUser?.role === "Supervisor" && (
               <div className="fade-in">
-                <h2 className="text-2xl font-bold text-gray-800 mb-6">👥 Gerenciar Usuários</h2>
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-bold text-gray-800">👥 Gerenciar Usuários</h2>
+                  <button onClick={() => setShowAddUserModal(true)} className="btn-primary">
+                    ➕ Adicionar Usuário
+                  </button>
+                </div>
 
                 <div className="chart-container">
                   <div className="px-6 py-4 border-b border-gray-200">
@@ -1312,8 +1455,19 @@ export default function Dashboard() {
                             <span className="text-white font-bold">{user.role === "Supervisor" ? "👑" : "🛠️"}</span>
                           </div>
                           <div>
-                            <h4 className="text-sm font-medium text-gray-800">{user.name}</h4>
+                            <div className="flex items-center space-x-2">
+                              <h4 className="text-sm font-medium text-gray-800">{user.name}</h4>
+                              {user.is_active === false && (
+                                <span className="status-badge bg-red-100 text-red-800">❌ Inativo</span>
+                              )}
+                            </div>
                             <p className="text-sm text-gray-600">@{user.username}</p>
+                            {user.deleted_at && (
+                              <p className="text-xs text-red-500">
+                                Excluído em {new Date(user.deleted_at).toLocaleDateString("pt-BR")} por{" "}
+                                {user.deleted_by}
+                              </p>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center space-x-4">
@@ -1333,16 +1487,40 @@ export default function Dashboard() {
                           <div className="text-sm text-gray-500">
                             {tickets.filter((t) => t.criado_por === user.name).length} tickets
                           </div>
+                          <div className="flex space-x-1">
+                            {user.is_active !== false ? (
+                              <>
+                                <button
+                                  onClick={() => openEditUserModal(user)}
+                                  className="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs"
+                                  title="Editar usuário"
+                                >
+                                  ✏️
+                                </button>
+                                {user.id !== currentUser?.id && (
+                                  <button
+                                    onClick={() => handleDeleteUser(user)}
+                                    className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs"
+                                    title="Excluir usuário"
+                                  >
+                                    🗑️
+                                  </button>
+                                )}
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => handleReactivateUser(user)}
+                                className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs"
+                                title="Reativar usuário"
+                              >
+                                🔄 Reativar
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}
                   </div>
-                </div>
-
-                <div className="mt-6">
-                  <button onClick={() => setShowAddUserModal(true)} className="btn-primary">
-                    ➕ Adicionar Usuário
-                  </button>
                 </div>
               </div>
             )}
@@ -1459,6 +1637,128 @@ export default function Dashboard() {
                     <button
                       type="button"
                       onClick={closeAddUserModal}
+                      className="btn-secondary flex-1"
+                      disabled={loading}
+                    >
+                      ❌ Cancelar
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Editar Usuário */}
+        {showEditUserModal && editingUser && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-xl font-bold text-gray-800">✏️ Editar Usuário</h3>
+                  <button onClick={closeEditUserModal} className="text-gray-400 hover:text-gray-600 text-2xl">
+                    ✕
+                  </button>
+                </div>
+
+                <form onSubmit={handleEditUser} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">👤 Nome Completo</label>
+                    <input
+                      type="text"
+                      value={editUserForm.name}
+                      onChange={(e) => setEditUserForm({ ...editUserForm, name: e.target.value })}
+                      className="form-input"
+                      placeholder="Ex: João Silva"
+                      required
+                      disabled={loading}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">🔑 Nome de Usuário</label>
+                    <input
+                      type="text"
+                      value={editUserForm.username}
+                      onChange={(e) => setEditUserForm({ ...editUserForm, username: e.target.value })}
+                      className="form-input"
+                      placeholder="Ex: joao.silva"
+                      required
+                      disabled={loading}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">👑 Função</label>
+                    <select
+                      value={editUserForm.role}
+                      onChange={(e) =>
+                        setEditUserForm({ ...editUserForm, role: e.target.value as "Supervisor" | "Tecnico" })
+                      }
+                      className="form-input"
+                      disabled={loading}
+                    >
+                      <option value="Tecnico">🛠️ Técnico</option>
+                      <option value="Supervisor">👑 Supervisor</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">🏢 Departamento</label>
+                    <select
+                      value={editUserForm.department}
+                      onChange={(e) => setEditUserForm({ ...editUserForm, department: e.target.value })}
+                      className="form-input"
+                      required
+                      disabled={loading}
+                    >
+                      <option value="">Selecione um departamento</option>
+                      {departamentos.map((dept) => (
+                        <option key={dept} value={dept}>
+                          {getDepartmentEmoji(dept)} {dept}
+                        </option>
+                      ))}
+                      <option value="Geral">🏢 Geral</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">🔒 Nova Senha (opcional)</label>
+                    <input
+                      type="password"
+                      value={editUserForm.password}
+                      onChange={(e) => setEditUserForm({ ...editUserForm, password: e.target.value })}
+                      className="form-input"
+                      placeholder="Deixe em branco para manter a atual"
+                      disabled={loading}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">🔒 Confirmar Nova Senha</label>
+                    <input
+                      type="password"
+                      value={editUserForm.confirmPassword}
+                      onChange={(e) => setEditUserForm({ ...editUserForm, confirmPassword: e.target.value })}
+                      className="form-input"
+                      placeholder="Confirme a nova senha"
+                      disabled={loading}
+                    />
+                  </div>
+
+                  {editUserError && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                      ❌ {editUserError}
+                    </div>
+                  )}
+
+                  <div className="flex space-x-3 pt-4">
+                    <button type="submit" className="btn-primary flex-1" disabled={loading}>
+                      {loading ? "🔄 Salvando..." : "✅ Salvar Alterações"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closeEditUserModal}
                       className="btn-secondary flex-1"
                       disabled={loading}
                     >
