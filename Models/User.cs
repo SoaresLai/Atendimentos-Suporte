@@ -6,15 +6,15 @@ namespace SupportDashboard.Models
     {
         public int Id { get; set; }
         
-        [Required(ErrorMessage = "Nome de usuário é obrigatório")]
+        [Required]
         [Display(Name = "Nome de Usuário")]
         public string Username { get; set; } = string.Empty;
         
-        [Required(ErrorMessage = "Senha é obrigatória")]
+        [Required]
         [Display(Name = "Senha")]
         public string Password { get; set; } = string.Empty;
         
-        [Required(ErrorMessage = "Nome completo é obrigatório")]
+        [Required]
         [Display(Name = "Nome Completo")]
         public string FullName { get; set; } = string.Empty;
         
@@ -30,14 +30,20 @@ namespace SupportDashboard.Models
         
         [Display(Name = "Último Login")]
         public DateTime? LastLogin { get; set; }
+        
+        [Display(Name = "Avatar")]
+        public string? Avatar { get; set; }
+        
+        [Display(Name = "Email")]
+        public string? Email { get; set; }
     }
     
     public enum UserRole
     {
         [Display(Name = "Técnico de Suporte")]
-        Support = 1,
+        Support,
         
         [Display(Name = "Supervisor/Chefe")]
-        Manager = 2
+        Manager
     }
 }

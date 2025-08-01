@@ -18,17 +18,42 @@ namespace SupportDashboard.Controllers
             _userService = userService;
         }
         
-        public IActionResult Index()
+        public IActionResult Index(FilterViewModel? filter)
         {
             var currentUserId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
             var currentUser = _userService.GetUserById(currentUserId);
             
+            var tickets = _ticketService.GetFilteredTickets(filter);
+            
             var viewModel = new DashboardViewModel
             {
-                Tickets = _ticketService.GetAllTickets(),
+                Tickets = tickets,
                 Metrics = _ticketService.GetMetrics(),
                 NovoTicket = new Ticket(),
-                CurrentUser = currentUser
+                CurrentUser = currentUser,
+                Filter = filter ?? new FilterViewModel()
+            };
+            
+            return View(viewModel);
+        }
+        
+        public IActionResult UserDashboard()
+        {
+            var currentUserId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+            var currentUser = _userService.GetUserById(currentUserId);
+            
+            if (currentUser == null)
+            {
+                return RedirectToAction("Login", "Auth");
+            }
+            
+            var viewModel = new UserDashboardViewModel
+            {
+                User = currentUser,
+                Stats = _ticketService.GetUserStats(currentUser.FullName),
+                RecentTickets = _ticketService.GetRecentTickets(5),
+                MyTickets = _ticketService.GetTicketsByUser(currentUser.FullName),
+                MonthlyActivity = _ticketService.GetMonthlyActivity(currentUser.FullName)
             };
             
             return View(viewModel);
@@ -53,7 +78,8 @@ namespace SupportDashboard.Controllers
                 Tickets = _ticketService.GetAllTickets(),
                 Metrics = _ticketService.GetMetrics(),
                 NovoTicket = ticket,
-                CurrentUser = _userService.GetUserById(int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0"))
+                CurrentUser = _userService.GetUserById(int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0")),
+                Filter = new FilterViewModel()
             };
             
             return View("Index", viewModel);
@@ -64,6 +90,12 @@ namespace SupportDashboard.Controllers
         {
             var metrics = _ticketService.GetMetrics();
             return Json(metrics);
+        }
+        
+        [HttpPost]
+        public IActionResult ClearFilters()
+        {
+            return RedirectToAction("Index");
         }
     }
 }

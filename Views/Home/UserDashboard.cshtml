@@ -1,0 +1,227 @@
+@model SupportDashboard.Models.UserDashboardViewModel
+
+<div class="row g-4 mb-4">
+    <!-- User Info Card -->
+    <div class="col-md-4">
+        <div class="card glass-card h-100">
+            <div class="card-body text-center">
+                <div class="user-avatar mb-3">
+                    <i class="fas fa-user-circle fa-4x text-primary"></i>
+                </div>
+                <h4>@Model.User.FullName</h4>
+                <span class="badge bg-@(Model.User.Role == SupportDashboard.Models.UserRole.Manager ? "primary" : "success") mb-3">
+                    @Model.User.Role.ToString()
+                </span>
+                <div class="user-stats-quick">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <h5 class="text-primary">@Model.Stats.TotalTicketsCriados</h5>
+                            <small class="text-muted">Total Tickets</small>
+                        </div>
+                        <div class="col-6">
+                            <h5 class="text-success">@Model.Stats.TaxaResolucao%</h5>
+                            <small class="text-muted">Taxa Resolução</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="col-md-8">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="metric-card bg-success">
+                    <div class="metric-icon">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="metric-content">
+                        <h3>@Model.Stats.TicketsResolvidos</h3>
+                        <p>Resolvidos</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="metric-card bg-warning">
+                    <div class="metric-icon">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <div class="metric-content">
+                        <h3>@Model.Stats.TicketsPendentes</h3>
+                        <p>Pendentes</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="metric-card bg-info">
+                    <div class="metric-icon">
+                        <i class="fas fa-calendar-day"></i>
+                    </div>
+                    <div class="metric-content">
+                        <h3>@Model.Stats.TicketsHoje</h3>
+                        <p>Hoje</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="metric-card bg-primary">
+                    <div class="metric-icon">
+                        <i class="fas fa-calendar-week"></i>
+                    </div>
+                    <div class="metric-content">
+                        <h3>@Model.Stats.TicketsSemana</h3>
+                        <p>Esta Semana</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row g-4 mb-4">
+    <!-- Departamentos Chart -->
+    <div class="col-md-6">
+        <div class="card glass-card">
+            <div class="card-header">
+                <h5><i class="fas fa-building me-2"></i>Tickets por Departamento</h5>
+            </div>
+            <div class="card-body">
+                @if (Model.Stats.TicketsPorDepartamento.Any(x => x.Value > 0))
+                {
+                    <div class="chart-container">
+                        @foreach (var dept in Model.Stats.TicketsPorDepartamento.Where(x => x.Value > 0))
+                        {
+                            <div class="chart-item mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="small">@dept.Key.ToString()</span>
+                                    <span class="badge bg-primary">@dept.Value</span>
+                                </div>
+                                <div class="progress" style="height: 8px;">
+                                    <div class="progress-bar" style="width: @(Model.Stats.TotalTicketsCriados > 0 ? (dept.Value * 100.0 / Model.Stats.TotalTicketsCriados) : 0)%"></div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center py-4">
+                        <i class="fas fa-chart-bar fa-2x text-muted mb-2"></i>
+                        <p class="text-muted">Nenhum ticket criado ainda</p>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Plataformas Chart -->
+    <div class="col-md-6">
+        <div class="card glass-card">
+            <div class="card-header">
+                <h5><i class="fas fa-desktop me-2"></i>Tickets por Plataforma</h5>
+            </div>
+            <div class="card-body">
+                @if (Model.Stats.TicketsPorPlataforma.Any(x => x.Value > 0))
+                {
+                    <div class="chart-container">
+                        @foreach (var plat in Model.Stats.TicketsPorPlataforma.Where(x => x.Value > 0))
+                        {
+                            <div class="chart-item mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="small">@plat.Key.ToString()</span>
+                                    <span class="badge bg-success">@plat.Value</span>
+                                </div>
+                                <div class="progress" style="height: 8px;">
+                                    <div class="progress-bar bg-success" style="width: @(Model.Stats.TotalTicketsCriados > 0 ? (plat.Value * 100.0 / Model.Stats.TotalTicketsCriados) : 0)%"></div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center py-4">
+                        <i class="fas fa-chart-pie fa-2x text-muted mb-2"></i>
+                        <p class="text-muted">Nenhum ticket criado ainda</p>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity -->
+<div class="row g-4">
+    <!-- Meus Tickets Recentes -->
+    <div class="col-md-6">
+        <div class="card glass-card">
+            <div class="card-header">
+                <h5><i class="fas fa-history me-2"></i>Meus Tickets Recentes</h5>
+            </div>
+            <div class="card-body">
+                @if (Model.MyTickets.Any())
+                {
+                    @foreach (var ticket in Model.MyTickets.Take(5))
+                    {
+                        <div class="ticket-item mb-3 p-3 border rounded">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h6 class="mb-1">@ticket.Empresa</h6>
+                                    <p class="small text-muted mb-1">@ticket.Assunto</p>
+                                    <small class="text-muted">@ticket.DataCriacao.ToString("dd/MM/yyyy HH:mm")</small>
+                                </div>
+                                <span class="badge bg-@(ticket.Status == SupportDashboard.Models.StatusTicket.Resolvido ? "success" : ticket.Status == SupportDashboard.Models.StatusTicket.EmAndamento ? "warning" : "info")">
+                                    @ticket.Status.ToString()
+                                </span>
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="text-center py-4">
+                        <i class="fas fa-ticket-alt fa-2x text-muted mb-2"></i>
+                        <p class="text-muted">Nenhum ticket criado ainda</p>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Atividade Mensal -->
+    <div class="col-md-6">
+        <div class="card glass-card">
+            <div class="card-header">
+                <h5><i class="fas fa-chart-line me-2"></i>Atividade dos Últimos 6 Meses</h5>
+            </div>
+            <div class="card-body">
+                @if (Model.MonthlyActivity.Any())
+                {
+                    <div class="monthly-chart">
+                        @foreach (var month in Model.MonthlyActivity)
+                        {
+                            <div class="month-item mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="small">@month.Key</span>
+                                    <span class="badge bg-info">@month.Value</span>
+                                </div>
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar bg-info" style="width: @(Model.MonthlyActivity.Values.Max() > 0 ? (month.Value * 100.0 / Model.MonthlyActivity.Values.Max()) : 0)%"></div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center py-4">
+                        <i class="fas fa-chart-line fa-2x text-muted mb-2"></i>
+                        <p class="text-muted">Sem dados de atividade</p>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>

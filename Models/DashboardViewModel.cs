@@ -6,6 +6,8 @@ namespace SupportDashboard.Models
         public DashboardMetrics Metrics { get; set; } = new DashboardMetrics();
         public Ticket NovoTicket { get; set; } = new Ticket();
         public User? CurrentUser { get; set; }
+        public FilterViewModel Filter { get; set; } = new FilterViewModel();
+        public List<string> AvailableCreators { get; set; } = new List<string>();
     }
     
     public class DashboardMetrics

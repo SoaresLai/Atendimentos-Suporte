@@ -148,6 +148,11 @@
                 <i class="fas fa-list me-2"></i>Lista de Tickets
             </button>
         </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="dashboard-tab" data-bs-toggle="tab" data-bs-target="#dashboard-pane" type="button">
+                <i class="fas fa-chart-bar me-2"></i>Meu Dashboard
+            </button>
+        </li>
         @if (Model.CurrentUser?.Role == SupportDashboard.Models.UserRole.Manager)
         {
             <li class="nav-item" role="presentation">
@@ -220,11 +225,73 @@
             </div>
         }
 
-        <!-- Lista -->
+        <!-- Lista com Filtros -->
         <div class="tab-pane fade @(Model.CurrentUser?.Role == SupportDashboard.Models.UserRole.Manager ? "show active" : "")" id="list-pane">
+            <!-- Filtros -->
+            <div class="card glass-card mb-4">
+                <div class="card-header">
+                    <h5><i class="fas fa-filter me-2"></i>Filtros de Pesquisa</h5>
+                </div>
+                <div class="card-body">
+                    <form asp-action="Index" method="get">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label asp-for="Filter.Empresa" class="form-label"></label>
+                                <input asp-for="Filter.Empresa" class="form-control" placeholder="Nome da empresa" />
+                            </div>
+                            <div class="col-md-3">
+                                <label asp-for="Filter.Plataforma" class="form-label"></label>
+                                <select asp-for="Filter.Plataforma" class="form-select" asp-items="Html.GetEnumSelectList<SupportDashboard.Models.Plataforma>()">
+                                    <option value="">Todas as plataformas</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label asp-for="Filter.Status" class="form-label"></label>
+                                <select asp-for="Filter.Status" class="form-select" asp-items="Html.GetEnumSelectList<SupportDashboard.Models.StatusTicket>()">
+                                    <option value="">Todos os status</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label asp-for="Filter.Departamento" class="form-label"></label>
+                                <select asp-for="Filter.Departamento" class="form-select" asp-items="Html.GetEnumSelectList<SupportDashboard.Models.Departamento>()">
+                                    <option value="">Todos os departamentos</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label asp-for="Filter.DataInicial" class="form-label"></label>
+                                <input asp-for="Filter.DataInicial" class="form-control" type="date" />
+                            </div>
+                            <div class="col-md-3">
+                                <label asp-for="Filter.DataFinal" class="form-label"></label>
+                                <input asp-for="Filter.DataFinal" class="form-control" type="date" />
+                            </div>
+                            <div class="col-md-3">
+                                <label asp-for="Filter.CriadoPor" class="form-label"></label>
+                                <input asp-for="Filter.CriadoPor" class="form-control" placeholder="Nome do criador" />
+                            </div>
+                            <div class="col-md-3 d-flex align-items-end">
+                                <div class="form-check me-3">
+                                    <input asp-for="Filter.ApenasImportantes" class="form-check-input" />
+                                    <label asp-for="Filter.ApenasImportantes" class="form-check-label"></label>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-primary me-2">
+                                    <i class="fas fa-search me-2"></i>Filtrar
+                                </button>
+                                <a asp-action="ClearFilters" class="btn btn-outline-secondary">
+                                    <i class="fas fa-times me-2"></i>Limpar Filtros
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Lista de Tickets -->
             <div class="card glass-card">
                 <div class="card-header">
-                    <h4><i class="fas fa-list me-2"></i>Lista de Tickets</h4>
+                    <h4><i class="fas fa-list me-2"></i>Lista de Tickets (@Model.Tickets.Count resultados)</h4>
                     <p class="text-muted mb-0">Visualize e gerencie todos os tickets cadastrados</p>
                 </div>
                 <div class="card-body">
@@ -250,7 +317,7 @@
                                                 {
                                                     <span class="badge bg-secondary">Normal</span>
                                                 }
-                                                <span class="badge @(ticket.Status == SupportDashboard.Models.StatusTicket.Resolvido ? "bg-success" : "bg-warning")">
+                                                <span class="badge @(ticket.Status == SupportDashboard.Models.StatusTicket.Resolvido ? "bg-success" : ticket.Status == SupportDashboard.Models.StatusTicket.EmAndamento ? "bg-warning" : "bg-info")">
                                                     @ticket.Status.ToString()
                                                 </span>
                                             </div>
@@ -270,9 +337,21 @@
                         <div class="text-center py-5">
                             <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
                             <h5 class="text-muted">Nenhum ticket encontrado</h5>
-                            <p class="text-muted">Adicione o primeiro ticket usando o formulário acima.</p>
+                            <p class="text-muted">Tente ajustar os filtros ou adicione novos tickets.</p>
                         </div>
                     }
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard do Usuário -->
+        <div class="tab-pane fade" id="dashboard-pane">
+            <div id="user-dashboard-content">
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
+                    <p class="mt-3">Carregando dashboard personalizado...</p>
                 </div>
             </div>
         </div>
@@ -358,4 +437,18 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script>
+        // Carregar dashboard do usuário quando a aba for clicada
+        document.getElementById('dashboard-tab').addEventListener('click', function() {
+            fetch('@Url.Action("UserDashboard", "Home")')
+                .then(response => response.text())
+                .then(html => {
+                    document.getElementById('user-dashboard-content').innerHTML = html;
+                })
+                .catch(error => {
+                    document.getElementById('user-dashboard-content').innerHTML = 
+                        '<div class="alert alert-danger">Erro ao carregar dashboard personalizado.</div>';
+                });
+        });
+    </script>
 }

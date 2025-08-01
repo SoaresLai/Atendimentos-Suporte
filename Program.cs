@@ -5,8 +5,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
-builder.Services.AddSingleton<TicketService>();
-builder.Services.AddSingleton<UserService>();
+builder.Services.AddScoped<TicketService>();
+builder.Services.AddScoped<UserService>();
 
 // Add authentication
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)

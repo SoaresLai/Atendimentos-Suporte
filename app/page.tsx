@@ -1,375 +1,1037 @@
 "use client"
 
-import { useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { BarChart3, Building2, CheckCircle, Clock, AlertCircle, Users, TrendingUp, Plus } from "lucide-react"
+import type React from "react"
 
-interface Ticket {
-  id: string
-  empresa: string
-  assunto: string
-  imp: "Sim" | "Não"
-  plataforma: "INTERCOM" | "GRONERZAP"
-  status: "Resolvido" | "Em Andamento" | "Pendente"
-  departamento: "CRIAÇÃO" | "PRECIFICAÇÃO" | "FLUXOS" | "AUTOMAÇÕES" | "REUNIÃO" | "TECHLEAD" | "SUPORTE" | "ENGENHARIA"
-  data: string
+import { useState, useEffect } from "react"
+import { cn } from "@/lib/utils"
+
+// Tipos
+interface User {
+  id: number
+  username: string
+  name: string
+  role: "Supervisor" | "Tecnico"
+  department: string
 }
 
-export default function SupportDashboard() {
-  const [tickets, setTickets] = useState<Ticket[]>([
-    {
-      id: "1",
-      empresa: "Futuro Solar",
-      assunto: "Mensagem automática fim de expediente",
-      imp: "Não",
-      plataforma: "INTERCOM",
-      status: "Resolvido",
-      departamento: "SUPORTE",
-      data: "31/07/2025",
-    },
-    {
-      id: "2",
-      empresa: "MV2 Engenharia",
-      assunto: "UpSell e DownSell",
-      imp: "Não",
-      plataforma: "INTERCOM",
-      status: "Resolvido",
-      departamento: "SUPORTE",
-      data: "31/07/2025",
-    },
-  ])
+interface Ticket {
+  id: number
+  empresa: string
+  plataforma: "INTERCOM" | "GRONERZAP"
+  departamento: string
+  descricao: string
+  status: "Em Andamento" | "Resolvido" | "Pendente"
+  importante: boolean
+  criadoPor: string
+  criadoEm: string
+}
 
-  const [newTicket, setNewTicket] = useState({
+interface UserStats {
+  totalTickets: number
+  resolvidos: number
+  pendentes: number
+  emAndamento: number
+  ticketsRecentes: Ticket[]
+  atividadeMensal: { mes: string; tickets: number }[]
+  porPlataforma: { plataforma: string; count: number }[]
+  porDepartamento: { departamento: string; count: number }[]
+}
+
+// Dados mockados
+const mockUsers: User[] = [
+  { id: 1, username: "admin", name: "João Silva", role: "Supervisor", department: "Geral" },
+  { id: 2, username: "tecnico1", name: "Maria Santos", role: "Tecnico", department: "Criação" },
+  { id: 3, username: "tecnico2", name: "Pedro Costa", role: "Tecnico", department: "Precificação" },
+  { id: 4, username: "tecnico3", name: "Ana Oliveira", role: "Tecnico", department: "Fluxos" },
+]
+
+const mockTickets: Ticket[] = [
+  {
+    id: 1,
+    empresa: "Tech Solutions Ltda",
+    plataforma: "INTERCOM",
+    departamento: "Criação",
+    descricao: "Problema com integração de API",
+    status: "Em Andamento",
+    importante: true,
+    criadoPor: "Maria Santos",
+    criadoEm: "2024-01-15T10:30:00",
+  },
+  {
+    id: 2,
+    empresa: "Inovação Digital",
+    plataforma: "GRONERZAP",
+    departamento: "Precificação",
+    descricao: "Erro no cálculo de preços",
+    status: "Resolvido",
+    importante: false,
+    criadoPor: "Pedro Costa",
+    criadoEm: "2024-01-14T14:20:00",
+  },
+  {
+    id: 3,
+    empresa: "StartUp ABC",
+    plataforma: "INTERCOM",
+    departamento: "Fluxos",
+    descricao: "Configuração de workflow",
+    status: "Pendente",
+    importante: true,
+    criadoPor: "Ana Oliveira",
+    criadoEm: "2024-01-13T09:15:00",
+  },
+  {
+    id: 4,
+    empresa: "Empresa XYZ",
+    plataforma: "GRONERZAP",
+    departamento: "Criação",
+    descricao: "Customização de template",
+    status: "Em Andamento",
+    importante: false,
+    criadoPor: "Maria Santos",
+    criadoEm: "2024-01-12T16:45:00",
+  },
+  {
+    id: 5,
+    empresa: "Global Corp",
+    plataforma: "INTERCOM",
+    departamento: "Precificação",
+    descricao: "Integração com sistema de pagamento",
+    status: "Resolvido",
+    importante: true,
+    criadoPor: "Pedro Costa",
+    criadoEm: "2024-01-11T11:30:00",
+  },
+]
+
+const departamentos = [
+  "Criação",
+  "Precificação",
+  "Fluxos",
+  "Integração",
+  "Suporte",
+  "Vendas",
+  "Marketing",
+  "Financeiro",
+]
+
+export default function Dashboard() {
+  const [currentUser, setCurrentUser] = useState<User | null>(null)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [activeTab, setActiveTab] = useState("")
+  const [tickets, setTickets] = useState<Ticket[]>(mockTickets)
+  const [filteredTickets, setFilteredTickets] = useState<Ticket[]>(mockTickets)
+  const [userStats, setUserStats] = useState<UserStats | null>(null)
+  const [loadingStats, setLoadingStats] = useState(false)
+
+  // Estados do formulário de login
+  const [loginForm, setLoginForm] = useState({ username: "", password: "", remember: false })
+  const [loginError, setLoginError] = useState("")
+
+  // Estados dos filtros
+  const [filters, setFilters] = useState({
     empresa: "",
-    assunto: "",
-    imp: "Não" as "Sim" | "Não",
-    plataforma: "GRONERZAP" as "INTERCOM" | "GRONERZAP",
-    status: "Em Andamento" as "Resolvido" | "Em Andamento" | "Pendente",
-    departamento: "SUPORTE" as
-      | "CRIAÇÃO"
-      | "PRECIFICAÇÃO"
-      | "FLUXOS"
-      | "AUTOMAÇÕES"
-      | "REUNIÃO"
-      | "TECHLEAD"
-      | "SUPORTE"
-      | "ENGENHARIA",
+    plataforma: "",
+    status: "",
+    departamento: "",
+    dataInicial: "",
+    dataFinal: "",
+    criadoPor: "",
+    apenasImportantes: false,
   })
 
-  const handleAddTicket = () => {
-    if (newTicket.empresa && newTicket.assunto) {
-      const ticket: Ticket = {
-        id: Date.now().toString(),
-        ...newTicket,
-        data: new Date().toLocaleDateString("pt-BR"),
-      }
-      setTickets([...tickets, ticket])
-      setNewTicket({
-        empresa: "",
-        assunto: "",
-        imp: "Não",
-        plataforma: "GRONERZAP",
-        status: "Em Andamento",
-        departamento: "SUPORTE",
-      })
+  // Estados do formulário de novo ticket
+  const [newTicket, setNewTicket] = useState({
+    empresa: "",
+    plataforma: "INTERCOM" as "INTERCOM" | "GRONERZAP",
+    departamento: "",
+    descricao: "",
+    importante: false,
+  })
+
+  // Verificar login salvo
+  useEffect(() => {
+    const savedUser = localStorage.getItem("currentUser")
+    if (savedUser) {
+      const user = JSON.parse(savedUser)
+      setCurrentUser(user)
+      setIsLoggedIn(true)
+      setActiveTab(user.role === "Supervisor" ? "tickets" : "novo")
+    }
+  }, [])
+
+  // Aplicar filtros
+  useEffect(() => {
+    let filtered = tickets
+
+    if (filters.empresa) {
+      filtered = filtered.filter((ticket) => ticket.empresa.toLowerCase().includes(filters.empresa.toLowerCase()))
+    }
+
+    if (filters.plataforma) {
+      filtered = filtered.filter((ticket) => ticket.plataforma === filters.plataforma)
+    }
+
+    if (filters.status) {
+      filtered = filtered.filter((ticket) => ticket.status === filters.status)
+    }
+
+    if (filters.departamento) {
+      filtered = filtered.filter((ticket) => ticket.departamento === filters.departamento)
+    }
+
+    if (filters.criadoPor) {
+      filtered = filtered.filter((ticket) => ticket.criadoPor.toLowerCase().includes(filters.criadoPor.toLowerCase()))
+    }
+
+    if (filters.apenasImportantes) {
+      filtered = filtered.filter((ticket) => ticket.importante)
+    }
+
+    if (filters.dataInicial) {
+      filtered = filtered.filter((ticket) => new Date(ticket.criadoEm) >= new Date(filters.dataInicial))
+    }
+
+    if (filters.dataFinal) {
+      filtered = filtered.filter((ticket) => new Date(ticket.criadoEm) <= new Date(filters.dataFinal))
+    }
+
+    setFilteredTickets(filtered)
+  }, [filters, tickets])
+
+  // Carregar estatísticas do usuário
+  const loadUserStats = async () => {
+    if (!currentUser) return
+
+    setLoadingStats(true)
+
+    // Simular carregamento
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+
+    const userTickets = tickets.filter((ticket) => ticket.criadoPor === currentUser.name)
+
+    const stats: UserStats = {
+      totalTickets: userTickets.length,
+      resolvidos: userTickets.filter((t) => t.status === "Resolvido").length,
+      pendentes: userTickets.filter((t) => t.status === "Pendente").length,
+      emAndamento: userTickets.filter((t) => t.status === "Em Andamento").length,
+      ticketsRecentes: userTickets.slice(0, 5),
+      atividadeMensal: [
+        { mes: "Ago", tickets: 12 },
+        { mes: "Set", tickets: 19 },
+        { mes: "Out", tickets: 15 },
+        { mes: "Nov", tickets: 22 },
+        { mes: "Dez", tickets: 18 },
+        { mes: "Jan", tickets: userTickets.length },
+      ],
+      porPlataforma: [
+        { plataforma: "INTERCOM", count: userTickets.filter((t) => t.plataforma === "INTERCOM").length },
+        { plataforma: "GRONERZAP", count: userTickets.filter((t) => t.plataforma === "GRONERZAP").length },
+      ],
+      porDepartamento: departamentos
+        .map((dep) => ({
+          departamento: dep,
+          count: userTickets.filter((t) => t.departamento === dep).length,
+        }))
+        .filter((item) => item.count > 0),
+    }
+
+    setUserStats(stats)
+    setLoadingStats(false)
+  }
+
+  // Função de login
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoginError("")
+
+    const user = mockUsers.find((u) => u.username === loginForm.username)
+
+    if (!user || loginForm.password !== "123456") {
+      setLoginError("Usuário ou senha incorretos")
+      return
+    }
+
+    setCurrentUser(user)
+    setIsLoggedIn(true)
+    setActiveTab(user.role === "Supervisor" ? "tickets" : "novo")
+
+    if (loginForm.remember) {
+      localStorage.setItem("currentUser", JSON.stringify(user))
     }
   }
 
-  // Cálculos das métricas
-  const totalAtendimentos = tickets.length
-  const resolvidos = tickets.filter((t) => t.status === "Resolvido").length
-  const naoResolvidos = tickets.filter((t) => t.status !== "Resolvido").length
-  const intercom = tickets.filter((t) => t.plataforma === "INTERCOM").length
-  const gronerzap = tickets.filter((t) => t.plataforma === "GRONERZAP").length
-  const conclusaoPercent = totalAtendimentos > 0 ? Math.round((resolvidos / totalAtendimentos) * 100) : 0
-  const emImplementacao = tickets.filter((t) => t.status === "Em Andamento").length
+  // Função de logout
+  const handleLogout = () => {
+    setCurrentUser(null)
+    setIsLoggedIn(false)
+    setActiveTab("")
+    localStorage.removeItem("currentUser")
+  }
 
-  // Contadores por departamento
-  const departmentCounts = {
-    CRIAÇÃO: tickets.filter((t) => t.departamento === "CRIAÇÃO").length,
-    PRECIFICAÇÃO: tickets.filter((t) => t.departamento === "PRECIFICAÇÃO").length,
-    FLUXOS: tickets.filter((t) => t.departamento === "FLUXOS").length,
-    AUTOMAÇÕES: tickets.filter((t) => t.departamento === "AUTOMAÇÕES").length,
-    REUNIÃO: tickets.filter((t) => t.departamento === "REUNIÃO").length,
-    TECHLEAD: tickets.filter((t) => t.departamento === "TECHLEAD").length,
-    SUPORTE: tickets.filter((t) => t.departamento === "SUPORTE").length,
-    ENGENHARIA: tickets.filter((t) => t.departamento === "ENGENHARIA").length,
+  // Função para criar novo ticket
+  const handleCreateTicket = (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!currentUser) return
+
+    const ticket: Ticket = {
+      id: tickets.length + 1,
+      empresa: newTicket.empresa,
+      plataforma: newTicket.plataforma,
+      departamento: newTicket.departamento,
+      descricao: newTicket.descricao,
+      status: "Em Andamento",
+      importante: newTicket.importante,
+      criadoPor: currentUser.name,
+      criadoEm: new Date().toISOString(),
+    }
+
+    setTickets([ticket, ...tickets])
+    setNewTicket({
+      empresa: "",
+      plataforma: "INTERCOM",
+      departamento: "",
+      descricao: "",
+      importante: false,
+    })
+
+    alert("Ticket criado com sucesso!")
+  }
+
+  // Função para limpar filtros
+  const clearFilters = () => {
+    setFilters({
+      empresa: "",
+      plataforma: "",
+      status: "",
+      departamento: "",
+      dataInicial: "",
+      dataFinal: "",
+      criadoPor: "",
+      apenasImportantes: false,
+    })
+  }
+
+  // Função para obter cor do status
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "Resolvido":
+        return "bg-green-100 text-green-800"
+      case "Em Andamento":
+        return "bg-blue-100 text-blue-800"
+      case "Pendente":
+        return "bg-yellow-100 text-yellow-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
+  }
+
+  // Função para obter emoji do departamento
+  const getDepartmentEmoji = (dept: string) => {
+    const emojis: { [key: string]: string } = {
+      Criação: "🎨",
+      Precificação: "💰",
+      Fluxos: "🔄",
+      Integração: "🔗",
+      Suporte: "🛠️",
+      Vendas: "💼",
+      Marketing: "📢",
+      Financeiro: "📊",
+    }
+    return emojis[dept] || "📋"
+  }
+
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl p-8 w-full max-w-md border border-white/20">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-2xl">🔒</span>
+            </div>
+            <h1 className="text-2xl font-bold text-gray-800 mb-2">Sistema de Suporte</h1>
+            <p className="text-gray-600">Faça login para acessar o dashboard</p>
+          </div>
+
+          <form onSubmit={handleLogin} className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">👤 Usuário</label>
+              <input
+                type="text"
+                value={loginForm.username}
+                onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                placeholder="Digite seu usuário"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">🔑 Senha</label>
+              <input
+                type="password"
+                value={loginForm.password}
+                onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                placeholder="Digite sua senha"
+                required
+              />
+            </div>
+
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="remember"
+                checked={loginForm.remember}
+                onChange={(e) => setLoginForm({ ...loginForm, remember: e.target.checked })}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <label htmlFor="remember" className="ml-2 block text-sm text-gray-700">
+                Lembrar-me
+              </label>
+            </div>
+
+            {loginError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">❌ {loginError}</div>
+            )}
+
+            <button
+              type="submit"
+              className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 px-4 rounded-lg hover:from-blue-600 hover:to-indigo-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all font-medium"
+            >
+              🚀 Entrar
+            </button>
+          </form>
+
+          <div className="mt-8 p-4 bg-gray-50 rounded-lg">
+            <p className="text-sm text-gray-600 mb-2">
+              🧪 <strong>Credenciais de teste:</strong>
+            </p>
+            <div className="text-xs text-gray-500 space-y-1">
+              <div>
+                👑 <strong>Supervisor:</strong> admin / 123456
+              </div>
+              <div>
+                🛠️ <strong>Técnico:</strong> tecnico1 / 123456
+              </div>
+              <div>
+                🛠️ <strong>Técnico:</strong> tecnico2 / 123456
+              </div>
+              <div>
+                🛠️ <strong>Técnico:</strong> tecnico3 / 123456
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100 p-4">
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold text-gray-900">Sistema de Acompanhamento - Suporte</h1>
-          <p className="text-gray-600">Gerencie tickets e acompanhe métricas em tempo real</p>
-        </div>
-
-        {/* Dashboard de Métricas */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="bg-white/80 backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Atendimentos</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalAtendimentos}</div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/80 backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Resolvidos</CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{resolvidos}</div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/80 backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Não Resolvidos</CardTitle>
-              <AlertCircle className="h-4 w-4 text-red-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">{naoResolvidos}</div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/80 backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Taxa de Conclusão</CardTitle>
-              <TrendingUp className="h-4 w-4 text-blue-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">{conclusaoPercent}%</div>
-              <Progress value={conclusaoPercent} className="mt-2" />
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Balanços por Plataforma */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="bg-white/80 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="text-lg">Intercom</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-blue-600">{intercom}</div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/80 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="text-lg">GronerZap</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-green-600">{gronerzap}</div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/80 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="text-lg">Em Implementação</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-orange-600">{emImplementacao}</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Departamentos */}
-        <Card className="bg-white/80 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle>Distribuição por Departamento</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {Object.entries(departmentCounts).map(([dept, count]) => (
-                <div key={dept} className="text-center p-3 rounded-lg bg-gray-50">
-                  <div className="text-sm font-medium text-gray-600">{dept}</div>
-                  <div className="text-2xl font-bold mt-1">{count}</div>
-                </div>
-              ))}
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      {/* Header */}
+      <header className="bg-white/80 backdrop-blur-lg border-b border-white/20 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center space-x-4">
+              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold">📊</span>
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-gray-800">Sistema de Suporte</h1>
+                <p className="text-sm text-gray-600">Dashboard de Tickets</p>
+              </div>
             </div>
-          </CardContent>
-        </Card>
 
-        {/* Tabs para Formulário e Lista */}
-        <Tabs defaultValue="form" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="form">Novo Ticket</TabsTrigger>
-            <TabsTrigger value="list">Lista de Tickets</TabsTrigger>
-          </TabsList>
+            <div className="flex items-center space-x-4">
+              <div className="text-right">
+                <p className="text-sm font-medium text-gray-800">
+                  {currentUser?.role === "Supervisor" ? "👑" : "🛠️"} {currentUser?.name}
+                </p>
+                <p className="text-xs text-gray-600">
+                  {currentUser?.role} - {currentUser?.department}
+                </p>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
+              >
+                🚪 Sair
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
 
-          <TabsContent value="form" className="space-y-4">
-            <Card className="bg-white/80 backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Plus className="h-5 w-5" />
-                  Cadastrar Novo Ticket
-                </CardTitle>
-                <CardDescription>Preencha as informações para adicionar um novo ticket ao sistema</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="empresa">Empresa</Label>
-                    <Input
-                      id="empresa"
-                      placeholder="Nome da empresa"
-                      value={newTicket.empresa}
-                      onChange={(e) => setNewTicket({ ...newTicket, empresa: e.target.value })}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Tabs */}
+        <div className="bg-white/80 backdrop-blur-lg rounded-xl shadow-lg border border-white/20 mb-8">
+          <div className="border-b border-gray-200">
+            <nav className="flex space-x-8 px-6">
+              {currentUser?.role === "Tecnico" && (
+                <button
+                  onClick={() => setActiveTab("novo")}
+                  className={cn(
+                    "py-4 px-2 border-b-2 font-medium text-sm transition-colors",
+                    activeTab === "novo"
+                      ? "border-blue-500 text-blue-600"
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300",
+                  )}
+                >
+                  ➕ Novo Ticket
+                </button>
+              )}
+
+              <button
+                onClick={() => setActiveTab("tickets")}
+                className={cn(
+                  "py-4 px-2 border-b-2 font-medium text-sm transition-colors",
+                  activeTab === "tickets"
+                    ? "border-blue-500 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300",
+                )}
+              >
+                📋 Lista de Tickets
+                <span className="ml-2 bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                  {filteredTickets.length}
+                </span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setActiveTab("dashboard")
+                  loadUserStats()
+                }}
+                className={cn(
+                  "py-4 px-2 border-b-2 font-medium text-sm transition-colors",
+                  activeTab === "dashboard"
+                    ? "border-blue-500 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300",
+                )}
+              >
+                📊 Meu Dashboard
+              </button>
+
+              {currentUser?.role === "Supervisor" && (
+                <button
+                  onClick={() => setActiveTab("usuarios")}
+                  className={cn(
+                    "py-4 px-2 border-b-2 font-medium text-sm transition-colors",
+                    activeTab === "usuarios"
+                      ? "border-blue-500 text-blue-600"
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300",
+                  )}
+                >
+                  👥 Usuários
+                  <span className="ml-2 bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full">
+                    {mockUsers.length}
+                  </span>
+                </button>
+              )}
+            </nav>
+          </div>
+
+          <div className="p-6">
+            {/* Tab: Novo Ticket */}
+            {activeTab === "novo" && currentUser?.role === "Tecnico" && (
+              <div className="max-w-2xl">
+                <h2 className="text-2xl font-bold text-gray-800 mb-6">➕ Criar Novo Ticket</h2>
+
+                <form onSubmit={handleCreateTicket} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">🏢 Empresa</label>
+                      <input
+                        type="text"
+                        value={newTicket.empresa}
+                        onChange={(e) => setNewTicket({ ...newTicket, empresa: e.target.value })}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Nome da empresa"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">💬 Plataforma</label>
+                      <select
+                        value={newTicket.plataforma}
+                        onChange={(e) =>
+                          setNewTicket({ ...newTicket, plataforma: e.target.value as "INTERCOM" | "GRONERZAP" })
+                        }
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="INTERCOM">💬 INTERCOM</option>
+                        <option value="GRONERZAP">📱 GRONERZAP</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">🏷️ Departamento</label>
+                      <select
+                        value={newTicket.departamento}
+                        onChange={(e) => setNewTicket({ ...newTicket, departamento: e.target.value })}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        required
+                      >
+                        <option value="">Selecione um departamento</option>
+                        {departamentos.map((dept) => (
+                          <option key={dept} value={dept}>
+                            {getDepartmentEmoji(dept)} {dept}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="importante"
+                        checked={newTicket.importante}
+                        onChange={(e) => setNewTicket({ ...newTicket, importante: e.target.checked })}
+                        className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="importante" className="ml-2 block text-sm text-gray-700">
+                        ⚠️ Marcar como importante
+                      </label>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">📝 Descrição do Problema</label>
+                    <textarea
+                      value={newTicket.descricao}
+                      onChange={(e) => setNewTicket({ ...newTicket, descricao: e.target.value })}
+                      rows={4}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Descreva detalhadamente o problema ou solicitação..."
+                      required
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="plataforma">Plataforma</Label>
-                    <Select
-                      value={newTicket.plataforma}
-                      onValueChange={(value: "INTERCOM" | "GRONERZAP") =>
-                        setNewTicket({ ...newTicket, plataforma: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="INTERCOM">INTERCOM</SelectItem>
-                        <SelectItem value="GRONERZAP">GRONERZAP</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <button
+                    type="submit"
+                    className="bg-gradient-to-r from-green-500 to-green-600 text-white px-6 py-3 rounded-lg hover:from-green-600 hover:to-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all font-medium"
+                  >
+                    ✅ Criar Ticket
+                  </button>
+                </form>
+              </div>
+            )}
 
-                  <div className="space-y-2">
-                    <Label htmlFor="departamento">Departamento</Label>
-                    <Select
-                      value={newTicket.departamento}
-                      onValueChange={(value: any) => setNewTicket({ ...newTicket, departamento: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="CRIAÇÃO">CRIAÇÃO</SelectItem>
-                        <SelectItem value="PRECIFICAÇÃO">PRECIFICAÇÃO</SelectItem>
-                        <SelectItem value="FLUXOS">FLUXOS</SelectItem>
-                        <SelectItem value="AUTOMAÇÕES">AUTOMAÇÕES</SelectItem>
-                        <SelectItem value="REUNIÃO">REUNIÃO</SelectItem>
-                        <SelectItem value="TECHLEAD">TECHLEAD</SelectItem>
-                        <SelectItem value="SUPORTE">SUPORTE</SelectItem>
-                        <SelectItem value="ENGENHARIA">ENGENHARIA</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="status">Status</Label>
-                    <Select
-                      value={newTicket.status}
-                      onValueChange={(value: any) => setNewTicket({ ...newTicket, status: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Em Andamento">Em Andamento</SelectItem>
-                        <SelectItem value="Resolvido">Resolvido</SelectItem>
-                        <SelectItem value="Pendente">Pendente</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="imp">Importante</Label>
-                    <Select
-                      value={newTicket.imp}
-                      onValueChange={(value: "Sim" | "Não") => setNewTicket({ ...newTicket, imp: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Não">Não</SelectItem>
-                        <SelectItem value="Sim">Sim</SelectItem>
-                      </SelectContent>
-                    </Select>
+            {/* Tab: Lista de Tickets */}
+            {activeTab === "tickets" && (
+              <div>
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-bold text-gray-800">📋 Lista de Tickets</h2>
+                  <div className="text-sm text-gray-600">
+                    Mostrando {filteredTickets.length} de {tickets.length} tickets
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="assunto">Assunto</Label>
-                  <Textarea
-                    id="assunto"
-                    placeholder="Descreva o assunto do ticket"
-                    value={newTicket.assunto}
-                    onChange={(e) => setNewTicket({ ...newTicket, assunto: e.target.value })}
-                  />
+                {/* Filtros */}
+                <div className="bg-gray-50 rounded-lg p-6 mb-6">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">🔍 Filtros</h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">🏢 Empresa</label>
+                      <input
+                        type="text"
+                        value={filters.empresa}
+                        onChange={(e) => setFilters({ ...filters, empresa: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                        placeholder="Buscar empresa..."
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">💬 Plataforma</label>
+                      <select
+                        value={filters.plataforma}
+                        onChange={(e) => setFilters({ ...filters, plataforma: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      >
+                        <option value="">Todas</option>
+                        <option value="INTERCOM">💬 INTERCOM</option>
+                        <option value="GRONERZAP">📱 GRONERZAP</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">📊 Status</label>
+                      <select
+                        value={filters.status}
+                        onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      >
+                        <option value="">Todos</option>
+                        <option value="Em Andamento">🔄 Em Andamento</option>
+                        <option value="Resolvido">✅ Resolvido</option>
+                        <option value="Pendente">⏳ Pendente</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">🏷️ Departamento</label>
+                      <select
+                        value={filters.departamento}
+                        onChange={(e) => setFilters({ ...filters, departamento: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      >
+                        <option value="">Todos</option>
+                        {departamentos.map((dept) => (
+                          <option key={dept} value={dept}>
+                            {getDepartmentEmoji(dept)} {dept}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">📅 Data Inicial</label>
+                      <input
+                        type="date"
+                        value={filters.dataInicial}
+                        onChange={(e) => setFilters({ ...filters, dataInicial: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">📅 Data Final</label>
+                      <input
+                        type="date"
+                        value={filters.dataFinal}
+                        onChange={(e) => setFilters({ ...filters, dataFinal: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">👤 Criado Por</label>
+                      <input
+                        type="text"
+                        value={filters.criadoPor}
+                        onChange={(e) => setFilters({ ...filters, criadoPor: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                        placeholder="Nome do usuário..."
+                      />
+                    </div>
+
+                    <div className="flex items-end">
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={filters.apenasImportantes}
+                          onChange={(e) => setFilters({ ...filters, apenasImportantes: e.target.checked })}
+                          className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                        />
+                        <span className="ml-2 text-sm text-gray-700">⚠️ Apenas Importantes</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={clearFilters}
+                    className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md transition-colors text-sm font-medium"
+                  >
+                    ❌ Limpar Filtros
+                  </button>
                 </div>
 
-                <Button onClick={handleAddTicket} className="w-full bg-emerald-600 hover:bg-emerald-700">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Adicionar Ticket
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="list" className="space-y-4">
-            <Card className="bg-white/80 backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5" />
-                  Lista de Tickets
-                </CardTitle>
-                <CardDescription>Visualize e gerencie todos os tickets cadastrados</CardDescription>
-              </CardHeader>
-              <CardContent>
+                {/* Lista de Tickets */}
                 <div className="space-y-4">
-                  {tickets.map((ticket) => (
-                    <div key={ticket.id} className="border rounded-lg p-4 space-y-2">
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-1">
-                          <h3 className="font-semibold text-lg">{ticket.empresa}</h3>
-                          <p className="text-gray-600">{ticket.assunto}</p>
+                  {filteredTickets.map((ticket) => (
+                    <div
+                      key={ticket.id}
+                      className="bg-white rounded-lg shadow-md border border-gray-200 p-6 hover:shadow-lg transition-shadow"
+                    >
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-3 mb-2">
+                            <h3 className="text-lg font-semibold text-gray-800">🏢 {ticket.empresa}</h3>
+                            {ticket.importante && (
+                              <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full font-medium">
+                                ⚠️ Importante
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-gray-600 mb-3">{ticket.descricao}</p>
+                          <div className="flex flex-wrap gap-2 text-sm">
+                            <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                              {ticket.plataforma === "INTERCOM" ? "💬" : "📱"} {ticket.plataforma}
+                            </span>
+                            <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded">
+                              {getDepartmentEmoji(ticket.departamento)} {ticket.departamento}
+                            </span>
+                            <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded">👤 {ticket.criadoPor}</span>
+                            <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded">
+                              📅 {new Date(ticket.criadoEm).toLocaleDateString("pt-BR")}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex gap-2">
-                          <Badge variant={ticket.imp === "Sim" ? "destructive" : "secondary"}>
-                            {ticket.imp === "Sim" ? "Importante" : "Normal"}
-                          </Badge>
-                          <Badge variant={ticket.status === "Resolvido" ? "default" : "outline"}>{ticket.status}</Badge>
+                        <div className="ml-4">
+                          <span
+                            className={cn("px-3 py-1 rounded-full text-sm font-medium", getStatusColor(ticket.status))}
+                          >
+                            {ticket.status === "Resolvido" && "✅"}
+                            {ticket.status === "Em Andamento" && "🔄"}
+                            {ticket.status === "Pendente" && "⏳"} {ticket.status}
+                          </span>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-4 text-sm text-gray-500">
-                        <span className="flex items-center gap-1">
-                          <Building2 className="h-4 w-4" />
-                          {ticket.plataforma}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Users className="h-4 w-4" />
-                          {ticket.departamento}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-4 w-4" />
-                          {ticket.data}
-                        </span>
                       </div>
                     </div>
                   ))}
+
+                  {filteredTickets.length === 0 && (
+                    <div className="text-center py-12">
+                      <div className="text-6xl mb-4">🔍</div>
+                      <h3 className="text-lg font-medium text-gray-800 mb-2">Nenhum ticket encontrado</h3>
+                      <p className="text-gray-600">Tente ajustar os filtros para encontrar tickets.</p>
+                    </div>
+                  )}
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+              </div>
+            )}
+
+            {/* Tab: Dashboard do Usuário */}
+            {activeTab === "dashboard" && (
+              <div>
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-bold text-gray-800">📊 Meu Dashboard</h2>
+                  <button
+                    onClick={loadUserStats}
+                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
+                  >
+                    🔄 Atualizar
+                  </button>
+                </div>
+
+                {loadingStats ? (
+                  <div className="flex justify-center items-center py-12">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+                    <span className="ml-3 text-gray-600">Carregando estatísticas...</span>
+                  </div>
+                ) : userStats ? (
+                  <div className="space-y-6">
+                    {/* Cards de Métricas */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                      <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-gray-600">Total de Tickets</p>
+                            <p className="text-3xl font-bold text-gray-800">{userStats.totalTickets}</p>
+                          </div>
+                          <div className="text-3xl">📋</div>
+                        </div>
+                      </div>
+
+                      <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-gray-600">Resolvidos</p>
+                            <p className="text-3xl font-bold text-green-600">{userStats.resolvidos}</p>
+                          </div>
+                          <div className="text-3xl">✅</div>
+                        </div>
+                      </div>
+
+                      <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-gray-600">Em Andamento</p>
+                            <p className="text-3xl font-bold text-blue-600">{userStats.emAndamento}</p>
+                          </div>
+                          <div className="text-3xl">🔄</div>
+                        </div>
+                      </div>
+
+                      <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-gray-600">Pendentes</p>
+                            <p className="text-3xl font-bold text-yellow-600">{userStats.pendentes}</p>
+                          </div>
+                          <div className="text-3xl">⏳</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Gráficos */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Atividade Mensal */}
+                      <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-4">📈 Atividade Mensal</h3>
+                        <div className="space-y-3">
+                          {userStats.atividadeMensal.map((item, index) => (
+                            <div key={index} className="flex items-center justify-between">
+                              <span className="text-sm text-gray-600">{item.mes}</span>
+                              <div className="flex items-center space-x-2 flex-1 mx-4">
+                                <div className="flex-1 bg-gray-200 rounded-full h-2">
+                                  <div
+                                    className="bg-blue-500 h-2 rounded-full transition-all duration-500"
+                                    style={{
+                                      width: `${(item.tickets / Math.max(...userStats.atividadeMensal.map((i) => i.tickets))) * 100}%`,
+                                    }}
+                                  ></div>
+                                </div>
+                                <span className="text-sm font-medium text-gray-800">{item.tickets}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Por Plataforma */}
+                      <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-4">💬 Por Plataforma</h3>
+                        <div className="space-y-4">
+                          {userStats.porPlataforma.map((item, index) => (
+                            <div key={index} className="flex items-center justify-between">
+                              <div className="flex items-center space-x-2">
+                                <span className="text-lg">{item.plataforma === "INTERCOM" ? "💬" : "📱"}</span>
+                                <span className="text-sm text-gray-600">{item.plataforma}</span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <div className="w-20 bg-gray-200 rounded-full h-2">
+                                  <div
+                                    className="bg-purple-500 h-2 rounded-full transition-all duration-500"
+                                    style={{ width: `${(item.count / userStats.totalTickets) * 100}%` }}
+                                  ></div>
+                                </div>
+                                <span className="text-sm font-medium text-gray-800 w-8 text-right">{item.count}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Por Departamento */}
+                    {userStats.porDepartamento.length > 0 && (
+                      <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-4">🏷️ Por Departamento</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {userStats.porDepartamento.map((item, index) => (
+                            <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                              <div className="flex items-center space-x-2">
+                                <span className="text-lg">{getDepartmentEmoji(item.departamento)}</span>
+                                <span className="text-sm text-gray-600">{item.departamento}</span>
+                              </div>
+                              <span className="text-sm font-medium text-gray-800 bg-white px-2 py-1 rounded">
+                                {item.count}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tickets Recentes */}
+                    {userStats.ticketsRecentes.length > 0 && (
+                      <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-4">🕒 Tickets Recentes</h3>
+                        <div className="space-y-3">
+                          {userStats.ticketsRecentes.map((ticket) => (
+                            <div
+                              key={ticket.id}
+                              className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                            >
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-2 mb-1">
+                                  <span className="font-medium text-gray-800">🏢 {ticket.empresa}</span>
+                                  {ticket.importante && <span className="text-red-500">⚠️</span>}
+                                </div>
+                                <p className="text-sm text-gray-600 truncate">{ticket.descricao}</p>
+                              </div>
+                              <div className="ml-4 text-right">
+                                <span
+                                  className={cn("px-2 py-1 rounded text-xs font-medium", getStatusColor(ticket.status))}
+                                >
+                                  {ticket.status === "Resolvido" && "✅"}
+                                  {ticket.status === "Em Andamento" && "🔄"}
+                                  {ticket.status === "Pendente" && "⏳"} {ticket.status}
+                                </span>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  {new Date(ticket.criadoEm).toLocaleDateString("pt-BR")}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <div className="text-6xl mb-4">📊</div>
+                    <h3 className="text-lg font-medium text-gray-800 mb-2">Dashboard Personalizado</h3>
+                    <p className="text-gray-600 mb-4">Clique em "Atualizar" para carregar suas estatísticas.</p>
+                    <button
+                      onClick={loadUserStats}
+                      className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition-colors font-medium"
+                    >
+                      📊 Carregar Dashboard
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Tab: Usuários (apenas para Supervisor) */}
+            {activeTab === "usuarios" && currentUser?.role === "Supervisor" && (
+              <div>
+                <h2 className="text-2xl font-bold text-gray-800 mb-6">👥 Gerenciar Usuários</h2>
+
+                <div className="bg-white rounded-lg shadow-md border border-gray-200">
+                  <div className="px-6 py-4 border-b border-gray-200">
+                    <h3 className="text-lg font-semibold text-gray-800">Lista de Usuários</h3>
+                  </div>
+                  <div className="divide-y divide-gray-200">
+                    {mockUsers.map((user) => (
+                      <div key={user.id} className="px-6 py-4 flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                            <span className="text-white font-bold">{user.role === "Supervisor" ? "👑" : "🛠️"}</span>
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-800">{user.name}</h4>
+                            <p className="text-sm text-gray-600">@{user.username}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                          <div className="text-right">
+                            <span
+                              className={cn(
+                                "px-2 py-1 rounded-full text-xs font-medium",
+                                user.role === "Supervisor"
+                                  ? "bg-purple-100 text-purple-800"
+                                  : "bg-blue-100 text-blue-800",
+                              )}
+                            >
+                              {user.role === "Supervisor" ? "👑 Supervisor" : "🛠️ Técnico"}
+                            </span>
+                            <p className="text-xs text-gray-500 mt-1">{user.department}</p>
+                          </div>
+                          <div className="flex space-x-2">
+                            <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">✏️ Editar</button>
+                            <button className="text-red-600 hover:text-red-800 text-sm font-medium">🗑️ Remover</button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-6">
+                  <button className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors font-medium">
+                    ➕ Adicionar Usuário
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )
