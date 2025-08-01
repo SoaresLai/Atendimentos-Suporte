@@ -127,6 +127,95 @@ const mockTickets: Ticket[] = [
     criadoPor: "João Silva",
     criadoEm: "2024-01-09T14:30:00",
   },
+  // Adicionando mais tickets com datas variadas para demonstrar a atividade mensal
+  {
+    id: 8,
+    empresa: "Solar Energy",
+    plataforma: "GRONERZAP",
+    departamento: "Automações",
+    descricao: "Configuração de bot",
+    status: "Resolvido",
+    emImplementacao: false,
+    criadoPor: "Maria Santos",
+    criadoEm: "2023-12-20T10:30:00",
+  },
+  {
+    id: 9,
+    empresa: "Tech Startup",
+    plataforma: "INTERCOM",
+    departamento: "Fluxos",
+    descricao: "Otimização de processo",
+    status: "Resolvido",
+    emImplementacao: true,
+    criadoPor: "Pedro Costa",
+    criadoEm: "2023-12-15T14:20:00",
+  },
+  {
+    id: 10,
+    empresa: "Digital Agency",
+    plataforma: "GRONERZAP",
+    departamento: "Criação",
+    descricao: "Design de templates",
+    status: "Resolvido",
+    emImplementacao: false,
+    criadoPor: "Ana Oliveira",
+    criadoEm: "2023-11-25T09:15:00",
+  },
+  {
+    id: 11,
+    empresa: "E-commerce Plus",
+    plataforma: "INTERCOM",
+    departamento: "Precificação",
+    descricao: "Sistema de descontos",
+    status: "Resolvido",
+    emImplementacao: true,
+    criadoPor: "Maria Santos",
+    criadoEm: "2023-11-10T16:45:00",
+  },
+  {
+    id: 12,
+    empresa: "Marketing Pro",
+    plataforma: "GRONERZAP",
+    departamento: "Automações",
+    descricao: "Campanhas automatizadas",
+    status: "Resolvido",
+    emImplementacao: false,
+    criadoPor: "Pedro Costa",
+    criadoEm: "2023-10-28T11:30:00",
+  },
+  {
+    id: 13,
+    empresa: "Business Solutions",
+    plataforma: "INTERCOM",
+    departamento: "Suporte",
+    descricao: "FAQ automatizado",
+    status: "Resolvido",
+    emImplementacao: true,
+    criadoPor: "João Silva",
+    criadoEm: "2023-10-15T09:00:00",
+  },
+  {
+    id: 14,
+    empresa: "Innovation Lab",
+    plataforma: "GRONERZAP",
+    departamento: "TechLead",
+    descricao: "Arquitetura de sistema",
+    status: "Resolvido",
+    emImplementacao: false,
+    criadoPor: "Ana Oliveira",
+    criadoEm: "2023-09-20T14:30:00",
+  },
+  {
+    id: 15,
+    empresa: "Growth Company",
+    plataforma: "INTERCOM",
+    departamento: "Fluxos",
+    descricao: "Processo de onboarding",
+    status: "Resolvido",
+    emImplementacao: true,
+    criadoPor: "Maria Santos",
+    criadoEm: "2023-09-05T10:30:00",
+  },
 ]
 
 const departamentos = [
@@ -139,6 +228,36 @@ const departamentos = [
   "Suporte",
   "Engenharia",
 ]
+
+// Função para calcular atividade mensal real
+const calculateMonthlyActivity = (tickets: Ticket[]): { mes: string; tickets: number }[] => {
+  const monthlyData: { [key: string]: number } = {}
+
+  // Inicializar os últimos 6 meses com 0
+  for (let i = 5; i >= 0; i--) {
+    const date = new Date()
+    date.setMonth(date.getMonth() - i)
+    const monthKey = date.toLocaleDateString("pt-BR", { month: "short", year: "numeric" })
+    monthlyData[monthKey] = 0
+  }
+
+  // Contar tickets por mês
+  tickets.forEach((ticket) => {
+    const ticketDate = new Date(ticket.criadoEm)
+    const monthKey = ticketDate.toLocaleDateString("pt-BR", { month: "short", year: "numeric" })
+
+    // Só contar se estiver nos últimos 6 meses
+    if (monthlyData.hasOwnProperty(monthKey)) {
+      monthlyData[monthKey]++
+    }
+  })
+
+  // Converter para array ordenado
+  return Object.entries(monthlyData).map(([mes, tickets]) => ({
+    mes,
+    tickets,
+  }))
+}
 
 export default function Dashboard() {
   const [currentUser, setCurrentUser] = useState<User | null>(null)
@@ -247,12 +366,17 @@ export default function Dashboard() {
     // Simular carregamento
     await new Promise((resolve) => setTimeout(resolve, 1000))
 
-    // Se for supervisor e tiver usuário selecionado, filtrar por esse usuário
-    let userTickets = tickets.filter((ticket) => ticket.criadoPor === currentUser.name)
+    // Determinar quais tickets usar para as estatísticas
+    let userTickets = tickets
 
     if (currentUser.role === "Supervisor" && selectedUserFilter) {
+      // Se for supervisor e tiver usuário selecionado, filtrar por esse usuário
       userTickets = tickets.filter((ticket) => ticket.criadoPor === selectedUserFilter)
+    } else if (currentUser.role === "Tecnico") {
+      // Se for técnico, mostrar apenas seus próprios tickets
+      userTickets = tickets.filter((ticket) => ticket.criadoPor === currentUser.name)
     }
+    // Se for supervisor sem filtro, mostra todos os tickets
 
     const stats: UserStats = {
       totalTickets: userTickets.length,
@@ -260,15 +384,10 @@ export default function Dashboard() {
       pendentes: userTickets.filter((t) => t.status === "Pendente").length,
       emAndamento: userTickets.filter((t) => t.status === "Em Andamento").length,
       emImplementacao: userTickets.filter((t) => t.emImplementacao).length,
-      ticketsRecentes: userTickets.slice(0, 5),
-      atividadeMensal: [
-        { mes: "Ago", tickets: 12 },
-        { mes: "Set", tickets: 19 },
-        { mes: "Out", tickets: 15 },
-        { mes: "Nov", tickets: 22 },
-        { mes: "Dez", tickets: 18 },
-        { mes: "Jan", tickets: userTickets.length },
-      ],
+      ticketsRecentes: userTickets
+        .sort((a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime())
+        .slice(0, 5),
+      atividadeMensal: calculateMonthlyActivity(userTickets),
       porPlataforma: [
         { plataforma: "INTERCOM", count: userTickets.filter((t) => t.plataforma === "INTERCOM").length },
         { plataforma: "GRONERZAP", count: userTickets.filter((t) => t.plataforma === "GRONERZAP").length },
@@ -1023,7 +1142,7 @@ export default function Dashboard() {
                           onChange={(e) => setSelectedUserFilter(e.target.value)}
                           className="form-input"
                         >
-                          <option value="">Meus tickets</option>
+                          <option value="">Todos os tickets</option>
                           {mockUsers
                             .filter((u) => u.role === "Tecnico")
                             .map((user) => (
@@ -1104,25 +1223,37 @@ export default function Dashboard() {
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       {/* Atividade Mensal */}
                       <div className="chart-container">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-4">📈 Atividade Mensal</h3>
+                        <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                          📈 Atividade Mensal (Últimos 6 Meses)
+                        </h3>
                         <div className="space-y-3">
-                          {userStats.atividadeMensal.map((item, index) => (
-                            <div key={index} className="flex items-center justify-between">
-                              <span className="text-sm text-gray-600">{item.mes}</span>
-                              <div className="flex items-center space-x-2 flex-1 mx-4">
-                                <div className="chart-bar">
-                                  <div
-                                    className="chart-fill bg-emerald-500"
-                                    style={{
-                                      width: `${(item.tickets / Math.max(...userStats.atividadeMensal.map((i) => i.tickets))) * 100}%`,
-                                    }}
-                                  ></div>
+                          {userStats.atividadeMensal.map((item, index) => {
+                            const maxTickets = Math.max(...userStats.atividadeMensal.map((i) => i.tickets))
+                            const percentage = maxTickets > 0 ? (item.tickets / maxTickets) * 100 : 0
+
+                            return (
+                              <div key={index} className="flex items-center justify-between">
+                                <span className="text-sm text-gray-600 w-16">{item.mes}</span>
+                                <div className="flex items-center space-x-2 flex-1 mx-4">
+                                  <div className="chart-bar">
+                                    <div
+                                      className="chart-fill bg-emerald-500"
+                                      style={{ width: `${percentage}%` }}
+                                    ></div>
+                                  </div>
+                                  <span className="text-sm font-medium text-gray-800 w-8 text-right">
+                                    {item.tickets}
+                                  </span>
                                 </div>
-                                <span className="text-sm font-medium text-gray-800">{item.tickets}</span>
                               </div>
-                            </div>
-                          ))}
+                            )
+                          })}
                         </div>
+                        {userStats.atividadeMensal.every((item) => item.tickets === 0) && (
+                          <div className="text-center py-4 text-gray-500">
+                            📊 Nenhum ticket criado nos últimos 6 meses
+                          </div>
+                        )}
                       </div>
 
                       {/* Por Plataforma */}
@@ -1270,6 +1401,260 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      <style jsx>{`
+        .login-container {
+          background: rgba(255, 255, 255, 0.95);
+          backdrop-filter: blur(10px);
+          border-radius: 16px;
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .glass-effect {
+          background: rgba(255, 255, 255, 0.95);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .form-input {
+          width: 100%;
+          padding: 12px 16px;
+          border: 1px solid #d1d5db;
+          border-radius: 8px;
+          font-size: 14px;
+          transition: all 0.2s;
+          background: white;
+        }
+
+        .form-input:focus {
+          outline: none;
+          border-color: #10b981;
+          box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+        }
+
+        .btn-primary {
+          background: linear-gradient(135deg, #10b981, #059669);
+          color: white;
+          padding: 12px 24px;
+          border: none;
+          border-radius: 8px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .btn-primary:hover {
+          background: linear-gradient(135deg, #059669, #047857);
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-secondary {
+          background: #f3f4f6;
+          color: #374151;
+          padding: 8px 16px;
+          border: 1px solid #d1d5db;
+          border-radius: 6px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .btn-secondary:hover {
+          background: #e5e7eb;
+          border-color: #9ca3af;
+        }
+
+        .stats-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+          gap: 24px;
+        }
+
+        .metric-card {
+          background: rgba(255, 255, 255, 0.95);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 16px;
+          padding: 24px;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+          transition: all 0.3s ease;
+        }
+
+        .metric-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        }
+
+        .department-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+          gap: 16px;
+        }
+
+        .department-card {
+          background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+          border: 1px solid #bae6fd;
+          border-radius: 12px;
+          padding: 16px;
+          text-align: center;
+          transition: all 0.2s;
+        }
+
+        .department-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+        }
+
+        .tab-button {
+          padding: 16px 0;
+          border-bottom: 2px solid transparent;
+          color: #6b7280;
+          font-weight: 500;
+          transition: all 0.2s;
+          background: none;
+          border-top: none;
+          border-left: none;
+          border-right: none;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .tab-button:hover {
+          color: #10b981;
+          border-bottom-color: #10b981;
+        }
+
+        .tab-button.active {
+          color: #10b981;
+          border-bottom-color: #10b981;
+          font-weight: 600;
+        }
+
+        .ticket-card {
+          background: rgba(255, 255, 255, 0.95);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 12px;
+          padding: 20px;
+          transition: all 0.3s ease;
+        }
+
+        .ticket-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+        }
+
+        .status-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 4px 12px;
+          border-radius: 20px;
+          font-size: 12px;
+          font-weight: 600;
+          border: 1px solid;
+        }
+
+        .filter-section {
+          background: rgba(249, 250, 251, 0.8);
+          border: 1px solid #e5e7eb;
+          border-radius: 12px;
+          padding: 20px;
+        }
+
+        .chart-container {
+          background: rgba(255, 255, 255, 0.95);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 16px;
+          padding: 24px;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        }
+
+        .chart-bar {
+          width: 100%;
+          height: 8px;
+          background: #e5e7eb;
+          border-radius: 4px;
+          overflow: hidden;
+        }
+
+        .chart-fill {
+          height: 100%;
+          border-radius: 4px;
+          transition: width 0.3s ease;
+        }
+
+        .progress-bar {
+          width: 100%;
+          height: 6px;
+          background: #e5e7eb;
+          border-radius: 3px;
+          overflow: hidden;
+          margin-top: 8px;
+        }
+
+        .progress-fill {
+          height: 100%;
+          background: linear-gradient(90deg, #10b981, #059669);
+          border-radius: 3px;
+          transition: width 0.3s ease;
+        }
+
+        .loading-spinner {
+          width: 32px;
+          height: 32px;
+          border: 3px solid #e5e7eb;
+          border-top: 3px solid #10b981;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+
+        .fade-in {
+          animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        .slide-up {
+          animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 768px) {
+          .stats-grid {
+            grid-template-columns: 1fr;
+          }
+          
+          .department-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+          
+          .tab-button {
+            font-size: 14px;
+            padding: 12px 0;
+          }
+        }
+      `}</style>
     </div>
   )
 }
