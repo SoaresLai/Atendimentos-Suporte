@@ -1,1326 +1,795 @@
 "use client"
 
-import type React from "react"
 import { useState, useEffect } from "react"
-
-// Função utilitária para classes CSS
-function cn(...classes: string[]) {
-  return classes.filter(Boolean).join(" ")
-}
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
+import { toast } from "sonner"
+import {
+  TicketIcon,
+  UserIcon,
+  CalendarIcon,
+  ClockIcon,
+  FilterIcon,
+  PlusIcon,
+  SearchIcon,
+  TrashIcon,
+  EditIcon,
+  XIcon,
+  AlertCircleIcon,
+  CheckCircleIcon,
+  Clock4Icon,
+  BarChart3Icon,
+  ActivityIcon,
+} from "lucide-react"
 
 // Tipos
+interface Ticket {
+  id: number
+  title: string
+  description: string
+  status: "Aberto" | "Em Implementação" | "Resolvido" | "Fechado"
+  priority: "Baixa" | "Média" | "Alta" | "Crítica"
+  createdBy: string
+  createdAt: string
+  updatedAt: string
+  category: string
+}
+
 interface User {
   id: number
   username: string
   name: string
-  role: "Supervisor" | "Tecnico"
-  department: string
+  role: "Admin" | "Tecnico"
 }
 
-interface Ticket {
-  id: number
-  empresa: string
-  plataforma: "INTERCOM" | "GRONERZAP"
-  departamento: string
-  descricao: string
-  status: "Em Andamento" | "Resolvido" | "Pendente"
-  emImplementacao: boolean
-  criadoPor: string
-  criadoEm: string
-}
-
-interface UserStats {
-  totalTickets: number
-  resolvidos: number
-  pendentes: number
-  emAndamento: number
-  emImplementacao: number
-  ticketsRecentes: Ticket[]
-  atividadeMensal: { mes: string; tickets: number }[]
-  porPlataforma: { plataforma: string; count: number }[]
-  porDepartamento: { departamento: string; count: number }[]
+interface Filters {
+  status: string
+  priority: string
+  category: string
+  createdBy: string
+  dateFrom: string
+  dateTo: string
+  search: string
 }
 
 // Dados mockados
 const mockUsers: User[] = [
-  { id: 1, username: "admin", name: "João Silva", role: "Supervisor", department: "Geral" },
-  { id: 2, username: "tecnico1", name: "Maria Santos", role: "Tecnico", department: "Criação" },
-  { id: 3, username: "tecnico2", name: "Pedro Costa", role: "Tecnico", department: "Precificação" },
-  { id: 4, username: "tecnico3", name: "Ana Oliveira", role: "Tecnico", department: "Fluxos" },
+  { id: 1, username: "admin", name: "Administrador", role: "Admin" },
+  { id: 2, username: "tecnico1", name: "Maria Santos", role: "Tecnico" },
+  { id: 3, username: "tecnico2", name: "Pedro Costa", role: "Tecnico" },
+  { id: 4, username: "tecnico3", name: "Ana Oliveira", role: "Tecnico" },
 ]
 
 const mockTickets: Ticket[] = [
   {
     id: 1,
-    empresa: "Tech Solutions Ltda",
-    plataforma: "INTERCOM",
-    departamento: "Criação",
-    descricao: "Problema com integração de API",
-    status: "Em Andamento",
-    emImplementacao: true,
-    criadoPor: "Maria Santos",
-    criadoEm: "2024-01-15T10:30:00",
+    title: "Sistema de login não funciona",
+    description: "Usuários não conseguem fazer login no sistema",
+    status: "Aberto",
+    priority: "Alta",
+    createdBy: "Maria Santos",
+    createdAt: "2024-01-15T10:30:00",
+    updatedAt: "2024-01-15T10:30:00",
+    category: "Sistema",
   },
   {
     id: 2,
-    empresa: "Inovação Digital",
-    plataforma: "GRONERZAP",
-    departamento: "Precificação",
-    descricao: "Erro no cálculo de preços",
-    status: "Resolvido",
-    emImplementacao: false,
-    criadoPor: "Pedro Costa",
-    criadoEm: "2024-01-14T14:20:00",
+    title: "Erro na impressão de relatórios",
+    description: "Relatórios não estão sendo gerados corretamente",
+    status: "Em Implementação",
+    priority: "Média",
+    createdBy: "Pedro Costa",
+    createdAt: "2024-01-14T14:20:00",
+    updatedAt: "2024-01-15T09:15:00",
+    category: "Relatórios",
   },
   {
     id: 3,
-    empresa: "StartUp ABC",
-    plataforma: "INTERCOM",
-    departamento: "Fluxos",
-    descricao: "Configuração de workflow",
-    status: "Pendente",
-    emImplementacao: true,
-    criadoPor: "Ana Oliveira",
-    criadoEm: "2024-01-13T09:15:00",
+    title: "Lentidão no carregamento",
+    description: "Sistema está muito lento para carregar páginas",
+    status: "Resolvido",
+    priority: "Média",
+    createdBy: "Ana Oliveira",
+    createdAt: "2024-01-13T16:45:00",
+    updatedAt: "2024-01-14T11:30:00",
+    category: "Performance",
   },
   {
     id: 4,
-    empresa: "Empresa XYZ",
-    plataforma: "GRONERZAP",
-    departamento: "Criação",
-    descricao: "Customização de template",
-    status: "Em Andamento",
-    emImplementacao: false,
-    criadoPor: "Maria Santos",
-    criadoEm: "2024-01-12T16:45:00",
+    title: "Backup automático falhou",
+    description: "O backup automático não foi executado ontem",
+    status: "Fechado",
+    priority: "Crítica",
+    createdBy: "Maria Santos",
+    createdAt: "2024-01-12T08:00:00",
+    updatedAt: "2024-01-13T17:20:00",
+    category: "Infraestrutura",
   },
   {
     id: 5,
-    empresa: "Global Corp",
-    plataforma: "INTERCOM",
-    departamento: "Precificação",
-    descricao: "Integração com sistema de pagamento",
-    status: "Resolvido",
-    emImplementacao: true,
-    criadoPor: "Pedro Costa",
-    criadoEm: "2024-01-11T11:30:00",
+    title: "Usuário não consegue alterar senha",
+    description: "Função de alteração de senha apresenta erro",
+    status: "Aberto",
+    priority: "Baixa",
+    createdBy: "Pedro Costa",
+    createdAt: "2024-01-16T13:15:00",
+    updatedAt: "2024-01-16T13:15:00",
+    category: "Sistema",
   },
   {
     id: 6,
-    empresa: "Futuro Solar",
-    plataforma: "INTERCOM",
-    departamento: "Suporte",
-    descricao: "Mensagem automática fim de expediente",
-    status: "Resolvido",
-    emImplementacao: false,
-    criadoPor: "João Silva",
-    criadoEm: "2024-01-10T09:00:00",
+    title: "Integração com API externa",
+    description: "Implementar integração com nova API de pagamentos",
+    status: "Em Implementação",
+    priority: "Alta",
+    createdBy: "Administrador",
+    createdAt: "2024-01-10T09:30:00",
+    updatedAt: "2024-01-15T16:45:00",
+    category: "Desenvolvimento",
   },
   {
     id: 7,
-    empresa: "MV2 Engenharia",
-    plataforma: "INTERCOM",
-    departamento: "Suporte",
-    descricao: "UpSell e DownSell",
-    status: "Em Andamento",
-    emImplementacao: true,
-    criadoPor: "João Silva",
-    criadoEm: "2024-01-09T14:30:00",
+    title: "Atualização de segurança",
+    description: "Aplicar patches de segurança no servidor",
+    status: "Resolvido",
+    priority: "Crítica",
+    createdBy: "Administrador",
+    createdAt: "2024-01-11T07:20:00",
+    updatedAt: "2024-01-12T14:10:00",
+    category: "Segurança",
   },
 ]
 
-const departamentos = [
-  "Criação",
-  "Precificação",
-  "Fluxos",
-  "Automações",
-  "Reunião",
-  "TechLead",
-  "Suporte",
-  "Engenharia",
-]
+// Simulação de autenticação
+const getCurrentUser = (): User => {
+  // Simula diferentes usuários para teste
+  const userType = typeof window !== "undefined" ? localStorage.getItem("currentUser") || "admin" : "admin"
+  return mockUsers.find((u) => u.username === userType) || mockUsers[0]
+}
 
-export default function Dashboard() {
-  const [currentUser, setCurrentUser] = useState<User | null>(null)
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [activeTab, setActiveTab] = useState("")
+export default function SupportDashboard() {
+  const [currentUser, setCurrentUser] = useState<User>(mockUsers[0])
   const [tickets, setTickets] = useState<Ticket[]>(mockTickets)
-  const [filteredTickets, setFilteredTickets] = useState<Ticket[]>([])
-  const [userStats, setUserStats] = useState<UserStats | null>(null)
-  const [loadingStats, setLoadingStats] = useState(false)
-
-  // Estados do formulário de login
-  const [loginForm, setLoginForm] = useState({ username: "", password: "", remember: false })
-  const [loginError, setLoginError] = useState("")
-
-  // Estados dos filtros
-  const [filters, setFilters] = useState({
-    empresa: "",
-    plataforma: "",
+  const [filteredTickets, setFilteredTickets] = useState<Ticket[]>(mockTickets)
+  const [filters, setFilters] = useState<Filters>({
     status: "",
-    departamento: "",
-    dataInicial: "",
-    dataFinal: "",
-    criadoPor: "",
-    apenasEmImplementacao: false,
+    priority: "",
+    category: "",
+    createdBy: "",
+    dateFrom: "",
+    dateTo: "",
+    search: "",
   })
-
-  // Estados do formulário de novo ticket
+  const [editingStatus, setEditingStatus] = useState<number | null>(null)
   const [newTicket, setNewTicket] = useState({
-    empresa: "",
-    plataforma: "INTERCOM" as "INTERCOM" | "GRONERZAP",
-    departamento: "",
-    descricao: "",
-    emImplementacao: false,
+    title: "",
+    description: "",
+    priority: "Média" as const,
+    category: "Sistema",
   })
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
 
-  // Estados para edição e filtros
-  const [editingTicket, setEditingTicket] = useState<number | null>(null)
-  const [editStatus, setEditStatus] = useState<"Em Andamento" | "Resolvido" | "Pendente">("Em Andamento")
-  const [selectedUserFilter, setSelectedUserFilter] = useState("")
-
-  // Verificar login salvo
+  // Inicializar usuário atual
   useEffect(() => {
-    const savedUser = localStorage.getItem("currentUser")
-    if (savedUser) {
-      const user = JSON.parse(savedUser)
-      setCurrentUser(user)
-      setIsLoggedIn(true)
-      setActiveTab(user.role === "Supervisor" ? "tickets" : "novo")
-    }
+    setCurrentUser(getCurrentUser())
   }, [])
 
-  // Aplicar filtros baseados no usuário e filtros selecionados
+  // Filtrar tickets baseado no usuário e filtros
   useEffect(() => {
-    if (!currentUser) return
+    let filtered = tickets
 
-    // Primeiro, filtrar por usuário se for técnico
-    let baseTickets = tickets
+    // Se for técnico, mostrar apenas seus próprios tickets
     if (currentUser.role === "Tecnico") {
-      baseTickets = tickets.filter((ticket) => ticket.criadoPor === currentUser.name)
+      filtered = filtered.filter((ticket) => ticket.createdBy === currentUser.name)
     }
 
-    // Depois aplicar os filtros adicionais
-    let filtered = baseTickets
-
-    if (filters.empresa) {
-      filtered = filtered.filter((ticket) => ticket.empresa.toLowerCase().includes(filters.empresa.toLowerCase()))
-    }
-
-    if (filters.plataforma) {
-      filtered = filtered.filter((ticket) => ticket.plataforma === filters.plataforma)
-    }
-
+    // Aplicar filtros
     if (filters.status) {
       filtered = filtered.filter((ticket) => ticket.status === filters.status)
     }
-
-    if (filters.departamento) {
-      filtered = filtered.filter((ticket) => ticket.departamento === filters.departamento)
+    if (filters.priority) {
+      filtered = filtered.filter((ticket) => ticket.priority === filters.priority)
     }
-
-    if (filters.criadoPor) {
-      filtered = filtered.filter((ticket) => ticket.criadoPor.toLowerCase().includes(filters.criadoPor.toLowerCase()))
+    if (filters.category) {
+      filtered = filtered.filter((ticket) => ticket.category === filters.category)
     }
-
-    if (filters.apenasEmImplementacao) {
-      filtered = filtered.filter((ticket) => ticket.emImplementacao)
+    if (filters.createdBy && currentUser.role === "Admin") {
+      filtered = filtered.filter((ticket) => ticket.createdBy === filters.createdBy)
     }
-
-    if (filters.dataInicial) {
-      filtered = filtered.filter((ticket) => new Date(ticket.criadoEm) >= new Date(filters.dataInicial))
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase()
+      filtered = filtered.filter(
+        (ticket) =>
+          ticket.title.toLowerCase().includes(searchLower) ||
+          ticket.description.toLowerCase().includes(searchLower) ||
+          ticket.createdBy.toLowerCase().includes(searchLower),
+      )
     }
-
-    if (filters.dataFinal) {
-      filtered = filtered.filter((ticket) => new Date(ticket.criadoEm) <= new Date(filters.dataFinal))
+    if (filters.dateFrom) {
+      filtered = filtered.filter((ticket) => new Date(ticket.createdAt) >= new Date(filters.dateFrom))
+    }
+    if (filters.dateTo) {
+      filtered = filtered.filter((ticket) => new Date(ticket.createdAt) <= new Date(filters.dateTo))
     }
 
     setFilteredTickets(filtered)
-  }, [filters, tickets, currentUser])
+  }, [tickets, filters, currentUser])
 
-  // Carregar estatísticas do usuário
-  const loadUserStats = async () => {
-    if (!currentUser) return
-
-    setLoadingStats(true)
-
-    // Simular carregamento
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    // Se for supervisor e tiver usuário selecionado, filtrar por esse usuário
-    let userTickets = tickets.filter((ticket) => ticket.criadoPor === currentUser.name)
-
-    if (currentUser.role === "Supervisor" && selectedUserFilter) {
-      userTickets = tickets.filter((ticket) => ticket.criadoPor === selectedUserFilter)
+  // Funções auxiliares
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "Aberto":
+        return "bg-red-100 text-red-800 border-red-200"
+      case "Em Implementação":
+        return "bg-yellow-100 text-yellow-800 border-yellow-200"
+      case "Resolvido":
+        return "bg-green-100 text-green-800 border-green-200"
+      case "Fechado":
+        return "bg-gray-100 text-gray-800 border-gray-200"
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-200"
     }
-
-    const stats: UserStats = {
-      totalTickets: userTickets.length,
-      resolvidos: userTickets.filter((t) => t.status === "Resolvido").length,
-      pendentes: userTickets.filter((t) => t.status === "Pendente").length,
-      emAndamento: userTickets.filter((t) => t.status === "Em Andamento").length,
-      emImplementacao: userTickets.filter((t) => t.emImplementacao).length,
-      ticketsRecentes: userTickets.slice(0, 5),
-      atividadeMensal: [
-        { mes: "Ago", tickets: 12 },
-        { mes: "Set", tickets: 19 },
-        { mes: "Out", tickets: 15 },
-        { mes: "Nov", tickets: 22 },
-        { mes: "Dez", tickets: 18 },
-        { mes: "Jan", tickets: userTickets.length },
-      ],
-      porPlataforma: [
-        { plataforma: "INTERCOM", count: userTickets.filter((t) => t.plataforma === "INTERCOM").length },
-        { plataforma: "GRONERZAP", count: userTickets.filter((t) => t.plataforma === "GRONERZAP").length },
-      ],
-      porDepartamento: departamentos
-        .map((dep) => ({
-          departamento: dep,
-          count: userTickets.filter((t) => t.departamento === dep).length,
-        }))
-        .filter((item) => item.count > 0),
-    }
-
-    setUserStats(stats)
-    setLoadingStats(false)
   }
 
-  // Função de login
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoginError("")
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case "Crítica":
+        return "bg-red-100 text-red-800 border-red-200"
+      case "Alta":
+        return "bg-orange-100 text-orange-800 border-orange-200"
+      case "Média":
+        return "bg-yellow-100 text-yellow-800 border-yellow-200"
+      case "Baixa":
+        return "bg-green-100 text-green-800 border-green-200"
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-200"
+    }
+  }
 
-    const user = mockUsers.find((u) => u.username === loginForm.username)
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleString("pt-BR")
+  }
 
-    if (!user || loginForm.password !== "123456") {
-      setLoginError("Usuário ou senha incorretos")
+  // Calcular estatísticas baseadas nos tickets visíveis
+  const getVisibleTickets = () => {
+    if (currentUser.role === "Tecnico") {
+      return tickets.filter((ticket) => ticket.createdBy === currentUser.name)
+    }
+    return tickets
+  }
+
+  const visibleTickets = getVisibleTickets()
+  const stats = {
+    total: visibleTickets.length,
+    abertos: visibleTickets.filter((t) => t.status === "Aberto").length,
+    emAndamento: visibleTickets.filter((t) => t.status === "Em Implementação").length,
+    resolvidos: visibleTickets.filter((t) => t.status === "Resolvido").length,
+    fechados: visibleTickets.filter((t) => t.status === "Fechado").length,
+  }
+
+  // Handlers
+  const handleFilterChange = (key: keyof Filters, value: string) => {
+    setFilters((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const clearFilters = () => {
+    setFilters({
+      status: "",
+      priority: "",
+      category: "",
+      createdBy: "",
+      dateFrom: "",
+      dateTo: "",
+      search: "",
+    })
+  }
+
+  const handleStatusUpdate = (ticketId: number, newStatus: Ticket["status"]) => {
+    setTickets((prev) =>
+      prev.map((ticket) =>
+        ticket.id === ticketId ? { ...ticket, status: newStatus, updatedAt: new Date().toISOString() } : ticket,
+      ),
+    )
+    setEditingStatus(null)
+    toast.success("Status atualizado com sucesso!")
+  }
+
+  const handleDeleteTicket = (ticketId: number) => {
+    setTickets((prev) => prev.filter((ticket) => ticket.id !== ticketId))
+    toast.success("Ticket excluído com sucesso!")
+  }
+
+  const handleCreateTicket = () => {
+    if (!newTicket.title.trim() || !newTicket.description.trim()) {
+      toast.error("Título e descrição são obrigatórios!")
       return
     }
 
-    setCurrentUser(user)
-    setIsLoggedIn(true)
-    setActiveTab(user.role === "Supervisor" ? "tickets" : "novo")
-
-    if (loginForm.remember) {
-      localStorage.setItem("currentUser", JSON.stringify(user))
-    }
-  }
-
-  // Função de logout
-  const handleLogout = () => {
-    setCurrentUser(null)
-    setIsLoggedIn(false)
-    setActiveTab("")
-    setSelectedUserFilter("")
-    localStorage.removeItem("currentUser")
-  }
-
-  // Função para criar novo ticket
-  const handleCreateTicket = (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!currentUser) return
-
     const ticket: Ticket = {
-      id: tickets.length + 1,
-      empresa: newTicket.empresa,
-      plataforma: newTicket.plataforma,
-      departamento: newTicket.departamento,
-      descricao: newTicket.descricao,
-      status: "Em Andamento",
-      emImplementacao: newTicket.emImplementacao,
-      criadoPor: currentUser.name,
-      criadoEm: new Date().toISOString(),
+      id: Math.max(...tickets.map((t) => t.id)) + 1,
+      title: newTicket.title,
+      description: newTicket.description,
+      status: "Aberto",
+      priority: newTicket.priority,
+      createdBy: currentUser.name,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      category: newTicket.category,
     }
 
-    setTickets([ticket, ...tickets])
-    setNewTicket({
-      empresa: "",
-      plataforma: "INTERCOM",
-      departamento: "",
-      descricao: "",
-      emImplementacao: false,
-    })
-
-    alert("Ticket criado com sucesso!")
+    setTickets((prev) => [ticket, ...prev])
+    setNewTicket({ title: "", description: "", priority: "Média", category: "Sistema" })
+    setIsCreateDialogOpen(false)
+    toast.success("Ticket criado com sucesso!")
   }
 
-  // Função para limpar filtros
-  const clearFilters = () => {
-    setFilters({
-      empresa: "",
-      plataforma: "",
-      status: "",
-      departamento: "",
-      dataInicial: "",
-      dataFinal: "",
-      criadoPor: "",
-      apenasEmImplementacao: false,
-    })
-  }
-
-  // Função para excluir ticket (apenas admin)
-  const handleDeleteTicket = (ticketId: number) => {
-    if (currentUser?.role === "Supervisor" && confirm("Tem certeza que deseja excluir este ticket?")) {
-      setTickets(tickets.filter((t) => t.id !== ticketId))
-      alert("Ticket excluído com sucesso!")
+  const switchUser = (username: string) => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("currentUser", username)
+      window.location.reload()
     }
-  }
-
-  // Função para editar status do ticket
-  const handleEditStatus = (ticketId: number, newStatus: "Em Andamento" | "Resolvido" | "Pendente") => {
-    setTickets(tickets.map((ticket) => (ticket.id === ticketId ? { ...ticket, status: newStatus } : ticket)))
-    setEditingTicket(null)
-    alert("Status atualizado com sucesso!")
-  }
-
-  // Função para iniciar edição
-  const startEditing = (ticketId: number, currentStatus: "Em Andamento" | "Resolvido" | "Pendente") => {
-    setEditingTicket(ticketId)
-    setEditStatus(currentStatus)
-  }
-
-  // Função para obter cor do status
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Resolvido":
-        return "bg-green-100 text-green-800"
-      case "Em Andamento":
-        return "bg-blue-100 text-blue-800"
-      case "Pendente":
-        return "bg-yellow-100 text-yellow-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
-  }
-
-  // Função para obter emoji do departamento
-  const getDepartmentEmoji = (dept: string) => {
-    const emojis: { [key: string]: string } = {
-      Criação: "🎨",
-      Precificação: "💰",
-      Fluxos: "🔄",
-      Automações: "🤖",
-      Reunião: "🤝",
-      TechLead: "👨‍💻",
-      Suporte: "🛠️",
-      Engenharia: "⚙️",
-    }
-    return emojis[dept] || "📋"
-  }
-
-  // Cálculos das métricas gerais (baseado nos tickets visíveis para o usuário)
-  const visibleTickets =
-    currentUser?.role === "Supervisor" ? tickets : tickets.filter((t) => t.criadoPor === currentUser?.name)
-  const totalAtendimentos = filteredTickets.length
-  const resolvidos = filteredTickets.filter((t) => t.status === "Resolvido").length
-  const naoResolvidos = filteredTickets.filter((t) => t.status !== "Resolvido").length
-  const intercom = filteredTickets.filter((t) => t.plataforma === "INTERCOM").length
-  const gronerzap = filteredTickets.filter((t) => t.plataforma === "GRONERZAP").length
-  const conclusaoPercent = totalAtendimentos > 0 ? Math.round((resolvidos / totalAtendimentos) * 100) : 0
-  const emImplementacao = filteredTickets.filter((t) => t.emImplementacao).length
-
-  if (!isLoggedIn) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100 flex items-center justify-center p-4">
-        <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl p-8 w-full max-w-md border border-white/20">
-          <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-2xl">🔒</span>
-            </div>
-            <h1 className="text-2xl font-bold text-gray-800 mb-2">Sistema de Suporte</h1>
-            <p className="text-gray-600">Faça login para acessar o dashboard</p>
-          </div>
-
-          <form onSubmit={handleLogin} className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">👤 Usuário</label>
-              <input
-                type="text"
-                value={loginForm.username}
-                onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
-                placeholder="Digite seu usuário"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">🔑 Senha</label>
-              <input
-                type="password"
-                value={loginForm.password}
-                onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
-                placeholder="Digite sua senha"
-                required
-              />
-            </div>
-
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="remember"
-                checked={loginForm.remember}
-                onChange={(e) => setLoginForm({ ...loginForm, remember: e.target.checked })}
-                className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
-              />
-              <label htmlFor="remember" className="ml-2 block text-sm text-gray-700">
-                Lembrar-me
-              </label>
-            </div>
-
-            {loginError && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">❌ {loginError}</div>
-            )}
-
-            <button
-              type="submit"
-              className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 text-white py-3 px-4 rounded-lg hover:from-emerald-600 hover:to-teal-700 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition-all font-medium"
-            >
-              🚀 Entrar
-            </button>
-          </form>
-
-          <div className="mt-8 p-4 bg-gray-50 rounded-lg">
-            <p className="text-sm text-gray-600 mb-2">
-              🧪 <strong>Credenciais de teste:</strong>
-            </p>
-            <div className="text-xs text-gray-500 space-y-1">
-              <div>
-                👑 <strong>Supervisor:</strong> admin / 123456
-              </div>
-              <div>
-                🛠️ <strong>Técnico:</strong> tecnico1 / 123456
-              </div>
-              <div>
-                🛠️ <strong>Técnico:</strong> tecnico2 / 123456
-              </div>
-              <div>
-                🛠️ <strong>Técnico:</strong> tecnico3 / 123456
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white/80 backdrop-blur-lg border-b border-white/20 sticky top-0 z-50">
+      <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
-              <div className="w-10 h-10 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold">📊</span>
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-gray-800">Sistema de Acompanhamento - Suporte</h1>
-                <p className="text-sm text-gray-600">
-                  {currentUser?.role === "Supervisor"
-                    ? "Gerencie todos os tickets e acompanhe métricas em tempo real"
-                    : "Gerencie seus tickets e acompanhe suas métricas"}
-                </p>
-              </div>
+              <TicketIcon className="h-8 w-8 text-blue-600" />
+              <h1 className="text-xl font-semibold text-gray-900">Sistema de Suporte</h1>
             </div>
 
             <div className="flex items-center space-x-4">
-              <div className="text-right">
-                <p className="text-sm font-medium text-gray-800">
-                  {currentUser?.role === "Supervisor" ? "👑" : "🛠️"} {currentUser?.name}
-                </p>
-                <p className="text-xs text-gray-600">
-                  {currentUser?.role} - {currentUser?.department}
-                </p>
+              {/* Simulador de usuários para teste */}
+              <Select value={currentUser.username} onValueChange={switchUser}>
+                <SelectTrigger className="w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {mockUsers.map((user) => (
+                    <SelectItem key={user.id} value={user.username}>
+                      {user.name} ({user.role})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <div className="flex items-center space-x-2">
+                <UserIcon className="h-5 w-5 text-gray-500" />
+                <span className="text-sm font-medium text-gray-700">{currentUser.name}</span>
+                <Badge variant={currentUser.role === "Admin" ? "default" : "secondary"}>{currentUser.role}</Badge>
               </div>
-              <button
-                onClick={handleLogout}
-                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
-              >
-                🚪 Sair
-              </button>
             </div>
           </div>
         </div>
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Dashboard de Métricas Gerais */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-white/20">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">
-                  {currentUser?.role === "Supervisor" ? "Total Atendimentos" : "Meus Atendimentos"}
-                </p>
-                <p className="text-3xl font-bold text-gray-800">{totalAtendimentos}</p>
-                {filteredTickets.length !== visibleTickets.length && (
-                  <p className="text-xs text-gray-500">{visibleTickets.length} total</p>
-                )}
-              </div>
-              <span className="text-3xl">📊</span>
-            </div>
-          </div>
+        {/* Dashboard Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                {currentUser.role === "Admin" ? "Total Atendimentos" : "Meus Atendimentos"}
+              </CardTitle>
+              <BarChart3Icon className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.total}</div>
+              {currentUser.role === "Tecnico" && (
+                <p className="text-xs text-muted-foreground">✨ Visualizando apenas seus tickets</p>
+              )}
+            </CardContent>
+          </Card>
 
-          <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-white/20">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Resolvidos</p>
-                <p className="text-3xl font-bold text-green-600">{resolvidos}</p>
-              </div>
-              <span className="text-3xl">✅</span>
-            </div>
-          </div>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Abertos</CardTitle>
+              <AlertCircleIcon className="h-4 w-4 text-red-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">{stats.abertos}</div>
+              <p className="text-xs text-muted-foreground">Aguardando atendimento</p>
+            </CardContent>
+          </Card>
 
-          <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-white/20">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Não Resolvidos</p>
-                <p className="text-3xl font-bold text-red-600">{naoResolvidos}</p>
-              </div>
-              <span className="text-3xl">⚠️</span>
-            </div>
-          </div>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Em Implementação</CardTitle>
+              <Clock4Icon className="h-4 w-4 text-yellow-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-yellow-600">{stats.emAndamento}</div>
+              <p className="text-xs text-muted-foreground">Em desenvolvimento</p>
+            </CardContent>
+          </Card>
 
-          <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-white/20">
-            <div className="flex items-center justify-between">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Resolvidos</CardTitle>
+              <CheckCircleIcon className="h-4 w-4 text-green-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">{stats.resolvidos}</div>
+              <p className="text-xs text-muted-foreground">Aguardando validação</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Fechados</CardTitle>
+              <ActivityIcon className="h-4 w-4 text-gray-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-gray-600">{stats.fechados}</div>
+              <p className="text-xs text-muted-foreground">Concluídos</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Filtros */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <FilterIcon className="h-5 w-5" />
+              <span>Filtros</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
               <div>
-                <p className="text-sm font-medium text-gray-600">Taxa de Conclusão</p>
-                <p className="text-3xl font-bold text-emerald-600">{conclusaoPercent}%</p>
-                <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-                  <div
-                    className="bg-emerald-500 h-2 rounded-full transition-all duration-500"
-                    style={{ width: `${conclusaoPercent}%` }}
-                  ></div>
+                <Label htmlFor="search">Buscar</Label>
+                <div className="relative">
+                  <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    id="search"
+                    placeholder="Título, descrição..."
+                    value={filters.search}
+                    onChange={(e) => handleFilterChange("search", e.target.value)}
+                    className="pl-10"
+                  />
                 </div>
               </div>
-              <span className="text-3xl">📈</span>
+
+              <div>
+                <Label htmlFor="status">Status</Label>
+                <Select value={filters.status} onValueChange={(value) => handleFilterChange("status", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos os status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os status</SelectItem>
+                    <SelectItem value="Aberto">Aberto</SelectItem>
+                    <SelectItem value="Em Implementação">Em Implementação</SelectItem>
+                    <SelectItem value="Resolvido">Resolvido</SelectItem>
+                    <SelectItem value="Fechado">Fechado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="priority">Prioridade</Label>
+                <Select value={filters.priority} onValueChange={(value) => handleFilterChange("priority", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todas as prioridades" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as prioridades</SelectItem>
+                    <SelectItem value="Crítica">Crítica</SelectItem>
+                    <SelectItem value="Alta">Alta</SelectItem>
+                    <SelectItem value="Média">Média</SelectItem>
+                    <SelectItem value="Baixa">Baixa</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="category">Categoria</Label>
+                <Select value={filters.category} onValueChange={(value) => handleFilterChange("category", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todas as categorias" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as categorias</SelectItem>
+                    <SelectItem value="Sistema">Sistema</SelectItem>
+                    <SelectItem value="Relatórios">Relatórios</SelectItem>
+                    <SelectItem value="Performance">Performance</SelectItem>
+                    <SelectItem value="Infraestrutura">Infraestrutura</SelectItem>
+                    <SelectItem value="Desenvolvimento">Desenvolvimento</SelectItem>
+                    <SelectItem value="Segurança">Segurança</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          </div>
-        </div>
 
-        {/* Balanços por Plataforma */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-white/20">
-            <h3 className="text-lg font-semibold text-gray-800 mb-2 flex items-center gap-2">
-              <span>💬</span> Intercom
-            </h3>
-            <div className="text-3xl font-bold text-blue-600">{intercom}</div>
-          </div>
-
-          <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-white/20">
-            <h3 className="text-lg font-semibold text-gray-800 mb-2 flex items-center gap-2">
-              <span>📱</span> GronerZap
-            </h3>
-            <div className="text-3xl font-bold text-green-600">{gronerzap}</div>
-          </div>
-
-          <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-white/20">
-            <h3 className="text-lg font-semibold text-gray-800 mb-2 flex items-center gap-2">
-              <span>⚙️</span> Em Implementação
-            </h3>
-            <div className="text-3xl font-bold text-orange-600">{emImplementacao}</div>
-          </div>
-        </div>
-
-        {/* Departamentos */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-white/20 mb-8">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-            <span>🏢</span> Distribuição por Departamento
-          </h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {departamentos.map((dept) => {
-              const count = filteredTickets.filter((t) => t.departamento === dept).length
-              return (
-                <div key={dept} className="text-center p-3 rounded-lg bg-gray-50">
-                  <div className="text-sm font-medium text-gray-600 flex items-center justify-center gap-1">
-                    <span>{getDepartmentEmoji(dept)}</span>
-                    {dept}
-                  </div>
-                  <div className="text-2xl font-bold mt-1">{count}</div>
+            {/* Filtros adicionais para Admin */}
+            {currentUser.role === "Admin" && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                  <Label htmlFor="createdBy">Criado Por</Label>
+                  <Select value={filters.createdBy} onValueChange={(value) => handleFilterChange("createdBy", value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todos os usuários" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os usuários</SelectItem>
+                      {mockUsers.map((user) => (
+                        <SelectItem key={user.id} value={user.name}>
+                          {user.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              )
-            })}
-          </div>
-        </div>
 
-        {/* Tabs */}
-        <div className="bg-white/80 backdrop-blur-lg rounded-xl shadow-lg border border-white/20 mb-8">
-          <div className="border-b border-gray-200">
-            <nav className="flex space-x-8 px-6">
-              {currentUser?.role === "Tecnico" && (
-                <button
-                  onClick={() => setActiveTab("novo")}
-                  className={cn(
-                    "py-4 px-2 border-b-2 font-medium text-sm transition-colors",
-                    activeTab === "novo"
-                      ? "border-emerald-500 text-emerald-600"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300",
-                  )}
-                >
-                  ➕ Novo Ticket
-                </button>
-              )}
+                <div>
+                  <Label htmlFor="dateFrom">Data Inicial</Label>
+                  <Input
+                    id="dateFrom"
+                    type="date"
+                    value={filters.dateFrom}
+                    onChange={(e) => handleFilterChange("dateFrom", e.target.value)}
+                  />
+                </div>
 
-              <button
-                onClick={() => setActiveTab("tickets")}
-                className={cn(
-                  "py-4 px-2 border-b-2 font-medium text-sm transition-colors",
-                  activeTab === "tickets"
-                    ? "border-emerald-500 text-emerald-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300",
-                )}
-              >
-                📋 {currentUser?.role === "Supervisor" ? "Todos os Tickets" : "Meus Tickets"}
-                <span className="ml-2 bg-emerald-100 text-emerald-800 text-xs px-2 py-1 rounded-full">
-                  {filteredTickets.length}
-                </span>
-              </button>
+                <div>
+                  <Label htmlFor="dateTo">Data Final</Label>
+                  <Input
+                    id="dateTo"
+                    type="date"
+                    value={filters.dateTo}
+                    onChange={(e) => handleFilterChange("dateTo", e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
 
-              <button
-                onClick={() => {
-                  setActiveTab("dashboard")
-                  loadUserStats()
-                }}
-                className={cn(
-                  "py-4 px-2 border-b-2 font-medium text-sm transition-colors",
-                  activeTab === "dashboard"
-                    ? "border-emerald-500 text-emerald-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300",
-                )}
-              >
-                📊 Meu Dashboard
-              </button>
+            <div className="flex justify-between items-center">
+              <Button variant="outline" onClick={clearFilters}>
+                Limpar Filtros
+              </Button>
+              <span className="text-sm text-gray-500">
+                {filteredTickets.length} de {visibleTickets.length} tickets
+              </span>
+            </div>
+          </CardContent>
+        </Card>
 
-              {currentUser?.role === "Supervisor" && (
-                <button
-                  onClick={() => setActiveTab("usuarios")}
-                  className={cn(
-                    "py-4 px-2 border-b-2 font-medium text-sm transition-colors",
-                    activeTab === "usuarios"
-                      ? "border-emerald-500 text-emerald-600"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300",
-                  )}
-                >
-                  👥 Usuários
-                  <span className="ml-2 bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full">
-                    {mockUsers.length}
-                  </span>
-                </button>
-              )}
-            </nav>
-          </div>
-
-          <div className="p-6">
-            {/* Tab: Novo Ticket */}
-            {activeTab === "novo" && currentUser?.role === "Tecnico" && (
-              <div className="max-w-2xl">
-                <h2 className="text-2xl font-bold text-gray-800 mb-6">➕ Criar Novo Ticket</h2>
-
-                <form onSubmit={handleCreateTicket} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">🏢 Empresa</label>
-                      <input
-                        type="text"
-                        value={newTicket.empresa}
-                        onChange={(e) => setNewTicket({ ...newTicket, empresa: e.target.value })}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                        placeholder="Nome da empresa"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">💬 Plataforma</label>
-                      <select
-                        value={newTicket.plataforma}
-                        onChange={(e) =>
-                          setNewTicket({ ...newTicket, plataforma: e.target.value as "INTERCOM" | "GRONERZAP" })
-                        }
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                      >
-                        <option value="INTERCOM">💬 INTERCOM</option>
-                        <option value="GRONERZAP">📱 GRONERZAP</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">🏷️ Departamento</label>
-                      <select
-                        value={newTicket.departamento}
-                        onChange={(e) => setNewTicket({ ...newTicket, departamento: e.target.value })}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                        required
-                      >
-                        <option value="">Selecione um departamento</option>
-                        {departamentos.map((dept) => (
-                          <option key={dept} value={dept}>
-                            {getDepartmentEmoji(dept)} {dept}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="flex items-center">
-                      <input
-                        type="checkbox"
-                        id="emImplementacao"
-                        checked={newTicket.emImplementacao}
-                        onChange={(e) => setNewTicket({ ...newTicket, emImplementacao: e.target.checked })}
-                        className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
-                      />
-                      <label htmlFor="emImplementacao" className="ml-2 block text-sm text-gray-700">
-                        ⚙️ Marcar como em implementação
-                      </label>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">📝 Descrição do Problema</label>
-                    <textarea
-                      value={newTicket.descricao}
-                      onChange={(e) => setNewTicket({ ...newTicket, descricao: e.target.value })}
-                      rows={4}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                      placeholder="Descreva detalhadamente o problema ou solicitação..."
-                      required
+        {/* Lista de Tickets */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>{currentUser.role === "Admin" ? "Todos os Tickets" : "Meus Tickets"}</CardTitle>
+              <CardDescription>
+                {currentUser.role === "Admin"
+                  ? "Gerencie todos os tickets do sistema"
+                  : "Visualize e gerencie seus tickets"}
+              </CardDescription>
+            </div>
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <PlusIcon className="h-4 w-4 mr-2" />
+                  Novo Ticket
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[525px]">
+                <DialogHeader>
+                  <DialogTitle>Criar Novo Ticket</DialogTitle>
+                  <DialogDescription>Preencha as informações do novo ticket de suporte.</DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="title">Título</Label>
+                    <Input
+                      id="title"
+                      value={newTicket.title}
+                      onChange={(e) => setNewTicket((prev) => ({ ...prev, title: e.target.value }))}
+                      placeholder="Descreva brevemente o problema"
                     />
                   </div>
-
-                  <button
-                    type="submit"
-                    className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-6 py-3 rounded-lg hover:from-emerald-600 hover:to-teal-700 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition-all font-medium"
-                  >
-                    ✅ Criar Ticket
-                  </button>
-                </form>
+                  <div className="grid gap-2">
+                    <Label htmlFor="description">Descrição</Label>
+                    <Textarea
+                      id="description"
+                      value={newTicket.description}
+                      onChange={(e) => setNewTicket((prev) => ({ ...prev, description: e.target.value }))}
+                      placeholder="Descreva detalhadamente o problema"
+                      rows={4}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="priority">Prioridade</Label>
+                      <Select
+                        value={newTicket.priority}
+                        onValueChange={(value: any) => setNewTicket((prev) => ({ ...prev, priority: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Baixa">Baixa</SelectItem>
+                          <SelectItem value="Média">Média</SelectItem>
+                          <SelectItem value="Alta">Alta</SelectItem>
+                          <SelectItem value="Crítica">Crítica</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="category">Categoria</Label>
+                      <Select
+                        value={newTicket.category}
+                        onValueChange={(value) => setNewTicket((prev) => ({ ...prev, category: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Sistema">Sistema</SelectItem>
+                          <SelectItem value="Relatórios">Relatórios</SelectItem>
+                          <SelectItem value="Performance">Performance</SelectItem>
+                          <SelectItem value="Infraestrutura">Infraestrutura</SelectItem>
+                          <SelectItem value="Desenvolvimento">Desenvolvimento</SelectItem>
+                          <SelectItem value="Segurança">Segurança</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleCreateTicket}>Criar Ticket</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </CardHeader>
+          <CardContent>
+            {filteredTickets.length === 0 ? (
+              <div className="text-center py-12">
+                <TicketIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  {currentUser.role === "Admin" ? "Nenhum ticket encontrado" : "Você não possui tickets"}
+                </h3>
+                <p className="text-gray-500 mb-4">
+                  {currentUser.role === "Admin"
+                    ? "Tente ajustar os filtros ou criar um novo ticket."
+                    : "Crie seu primeiro ticket de suporte clicando no botão acima."}
+                </p>
               </div>
-            )}
-
-            {/* Tab: Lista de Tickets */}
-            {activeTab === "tickets" && (
-              <div>
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-800">
-                    📋 {currentUser?.role === "Supervisor" ? "Todos os Tickets" : "Meus Tickets"}
-                  </h2>
-                  <div className="text-sm text-gray-600">
-                    Mostrando {filteredTickets.length} de {visibleTickets.length} tickets
-                    {currentUser?.role === "Tecnico" && (
-                      <span className="block text-xs text-emerald-600 mt-1">✨ Visualizando apenas seus tickets</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Filtros */}
-                <div className="bg-gray-50 rounded-lg p-6 mb-6">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4">🔍 Filtros</h3>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">🏢 Empresa</label>
-                      <input
-                        type="text"
-                        value={filters.empresa}
-                        onChange={(e) => setFilters({ ...filters, empresa: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
-                        placeholder="Buscar empresa..."
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">💬 Plataforma</label>
-                      <select
-                        value={filters.plataforma}
-                        onChange={(e) => setFilters({ ...filters, plataforma: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
-                      >
-                        <option value="">Todas</option>
-                        <option value="INTERCOM">💬 INTERCOM</option>
-                        <option value="GRONERZAP">📱 GRONERZAP</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">📊 Status</label>
-                      <select
-                        value={filters.status}
-                        onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
-                      >
-                        <option value="">Todos</option>
-                        <option value="Em Andamento">🔄 Em Andamento</option>
-                        <option value="Resolvido">✅ Resolvido</option>
-                        <option value="Pendente">⏳ Pendente</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">🏷️ Departamento</label>
-                      <select
-                        value={filters.departamento}
-                        onChange={(e) => setFilters({ ...filters, departamento: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
-                      >
-                        <option value="">Todos</option>
-                        {departamentos.map((dept) => (
-                          <option key={dept} value={dept}>
-                            {getDepartmentEmoji(dept)} {dept}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">📅 Data Inicial</label>
-                      <input
-                        type="date"
-                        value={filters.dataInicial}
-                        onChange={(e) => setFilters({ ...filters, dataInicial: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">📅 Data Final</label>
-                      <input
-                        type="date"
-                        value={filters.dataFinal}
-                        onChange={(e) => setFilters({ ...filters, dataFinal: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
-                      />
-                    </div>
-
-                    {/* Campo "Criado Por" apenas para supervisores */}
-                    {currentUser?.role === "Supervisor" && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">👤 Criado Por</label>
-                        <input
-                          type="text"
-                          value={filters.criadoPor}
-                          onChange={(e) => setFilters({ ...filters, criadoPor: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
-                          placeholder="Nome do usuário..."
-                        />
-                      </div>
-                    )}
-
-                    <div className="flex items-end">
-                      <label className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={filters.apenasEmImplementacao}
-                          onChange={(e) => setFilters({ ...filters, apenasEmImplementacao: e.target.checked })}
-                          className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
-                        />
-                        <span className="ml-2 text-sm text-gray-700">⚙️ Apenas Em Implementação</span>
-                      </label>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={clearFilters}
-                    className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md transition-colors text-sm font-medium"
-                  >
-                    ❌ Limpar Filtros
-                  </button>
-                </div>
-
-                {/* Lista de Tickets */}
-                <div className="space-y-4">
-                  {filteredTickets.map((ticket) => (
-                    <div
-                      key={ticket.id}
-                      className="bg-white rounded-lg shadow-md border border-gray-200 p-6 hover:shadow-lg transition-shadow"
-                    >
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-3 mb-2">
-                            <h3 className="text-lg font-semibold text-gray-800">🏢 {ticket.empresa}</h3>
-                            {ticket.emImplementacao && (
-                              <span className="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full font-medium">
-                                ⚙️ Em Implementação
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-gray-600 mb-3">{ticket.descricao}</p>
-                          <div className="flex flex-wrap gap-2 text-sm">
-                            <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                              {ticket.plataforma === "INTERCOM" ? "💬" : "📱"} {ticket.plataforma}
-                            </span>
-                            <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded">
-                              {getDepartmentEmoji(ticket.departamento)} {ticket.departamento}
-                            </span>
-                            {currentUser?.role === "Supervisor" && (
-                              <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded">👤 {ticket.criadoPor}</span>
-                            )}
-                            <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded">
-                              📅 {new Date(ticket.criadoEm).toLocaleDateString("pt-BR")}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="ml-4 flex flex-col items-end space-y-2">
-                          {editingTicket === ticket.id ? (
-                            <div className="flex items-center space-x-2">
-                              <select
-                                value={editStatus}
-                                onChange={(e) =>
-                                  setEditStatus(e.target.value as "Em Andamento" | "Resolvido" | "Pendente")
-                                }
-                                className="px-2 py-1 border border-gray-300 rounded text-sm"
-                              >
-                                <option value="Em Andamento">🔄 Em Andamento</option>
-                                <option value="Resolvido">✅ Resolvido</option>
-                                <option value="Pendente">⏳ Pendente</option>
-                              </select>
-                              <button
-                                onClick={() => handleEditStatus(ticket.id, editStatus)}
-                                className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs"
-                              >
-                                ✅
-                              </button>
-                              <button
-                                onClick={() => setEditingTicket(null)}
-                                className="bg-gray-500 hover:bg-gray-600 text-white px-2 py-1 rounded text-xs"
-                              >
-                                ❌
-                              </button>
-                            </div>
-                          ) : (
-                            <span
-                              className={cn(
-                                "px-3 py-1 rounded-full text-sm font-medium",
-                                getStatusColor(ticket.status),
-                              )}
-                            >
-                              {ticket.status === "Resolvido" && "✅"}
-                              {ticket.status === "Em Andamento" && "🔄"}
-                              {ticket.status === "Pendente" && "⏳"} {ticket.status}
-                            </span>
-                          )}
-
-                          <div className="flex space-x-1">
-                            {/* Botão de editar status - apenas para o criador do ticket */}
-                            {currentUser?.name === ticket.criadoPor && editingTicket !== ticket.id && (
-                              <button
-                                onClick={() => startEditing(ticket.id, ticket.status)}
-                                className="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs"
-                                title="Editar status"
-                              >
-                                ✏️
-                              </button>
-                            )}
-
-                            {/* Botão de excluir - apenas para admin */}
-                            {currentUser?.role === "Supervisor" && (
-                              <button
-                                onClick={() => handleDeleteTicket(ticket.id)}
-                                className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs"
-                                title="Excluir ticket"
-                              >
-                                🗑️
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-
-                  {filteredTickets.length === 0 && (
-                    <div className="text-center py-12">
-                      <div className="text-6xl mb-4">🔍</div>
-                      <h3 className="text-lg font-medium text-gray-800 mb-2">
-                        {currentUser?.role === "Supervisor"
-                          ? "Nenhum ticket encontrado"
-                          : "Você ainda não criou tickets"}
-                      </h3>
-                      <p className="text-gray-600">
-                        {currentUser?.role === "Supervisor"
-                          ? "Tente ajustar os filtros para encontrar tickets."
-                          : "Crie seu primeiro ticket na aba 'Novo Ticket'."}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Tab: Dashboard do Usuário */}
-            {activeTab === "dashboard" && (
-              <div>
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-800">
-                    📊 Dashboard Pessoal - {selectedUserFilter || currentUser?.name}
-                  </h2>
-                  <div className="flex items-center space-x-4">
-                    {currentUser?.role === "Supervisor" && (
-                      <div className="flex items-center space-x-2">
-                        <label className="text-sm font-medium text-gray-700">👤 Filtrar por usuário:</label>
-                        <select
-                          value={selectedUserFilter}
-                          onChange={(e) => setSelectedUserFilter(e.target.value)}
-                          className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
-                        >
-                          <option value="">Meus tickets</option>
-                          {mockUsers
-                            .filter((u) => u.role === "Tecnico")
-                            .map((user) => (
-                              <option key={user.id} value={user.name}>
-                                {user.name}
-                              </option>
-                            ))}
-                        </select>
-                      </div>
-                    )}
-                    <button
-                      onClick={loadUserStats}
-                      className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
-                    >
-                      🔄 Atualizar
-                    </button>
-                  </div>
-                </div>
-
-                {loadingStats ? (
-                  <div className="flex justify-center items-center py-12">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
-                    <span className="ml-3 text-gray-600">Carregando estatísticas...</span>
-                  </div>
-                ) : userStats ? (
-                  <div className="space-y-6">
-                    {/* Cards de Métricas */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-                      <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-gray-600">Total de Tickets</p>
-                            <p className="text-3xl font-bold text-gray-800">{userStats.totalTickets}</p>
-                          </div>
-                          <div className="text-3xl">📋</div>
-                        </div>
-                      </div>
-
-                      <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-gray-600">Resolvidos</p>
-                            <p className="text-3xl font-bold text-green-600">{userStats.resolvidos}</p>
-                          </div>
-                          <div className="text-3xl">✅</div>
-                        </div>
-                      </div>
-
-                      <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-gray-600">Em Andamento</p>
-                            <p className="text-3xl font-bold text-blue-600">{userStats.emAndamento}</p>
-                          </div>
-                          <div className="text-3xl">🔄</div>
-                        </div>
-                      </div>
-
-                      <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-gray-600">Pendentes</p>
-                            <p className="text-3xl font-bold text-yellow-600">{userStats.pendentes}</p>
-                          </div>
-                          <div className="text-3xl">⏳</div>
-                        </div>
-                      </div>
-
-                      <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-gray-600">Em Implementação</p>
-                            <p className="text-3xl font-bold text-orange-600">{userStats.emImplementacao}</p>
-                          </div>
-                          <div className="text-3xl">⚙️</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Gráficos */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      {/* Atividade Mensal */}
-                      <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-4">📈 Atividade Mensal</h3>
-                        <div className="space-y-3">
-                          {userStats.atividadeMensal.map((item, index) => (
-                            <div key={index} className="flex items-center justify-between">
-                              <span className="text-sm text-gray-600">{item.mes}</span>
-                              <div className="flex items-center space-x-2 flex-1 mx-4">
-                                <div className="flex-1 bg-gray-200 rounded-full h-2">
-                                  <div
-                                    className="bg-emerald-500 h-2 rounded-full transition-all duration-500"
-                                    style={{
-                                      width: `${(item.tickets / Math.max(...userStats.atividadeMensal.map((i) => i.tickets))) * 100}%`,
-                                    }}
-                                  ></div>
-                                </div>
-                                <span className="text-sm font-medium text-gray-800">{item.tickets}</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Por Plataforma */}
-                      <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-4">💬 Por Plataforma</h3>
-                        <div className="space-y-4">
-                          {userStats.porPlataforma.map((item, index) => (
-                            <div key={index} className="flex items-center justify-between">
+            ) : (
+              <div className="space-y-4">
+                {filteredTickets.map((ticket) => (
+                  <div key={ticket.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3 mb-2">
+                          <h3 className="text-lg font-medium text-gray-900">
+                            #{ticket.id} - {ticket.title}
+                          </h3>
+                          <div className="flex items-center space-x-2">
+                            {editingStatus === ticket.id ? (
                               <div className="flex items-center space-x-2">
-                                <span className="text-lg">{item.plataforma === "INTERCOM" ? "💬" : "📱"}</span>
-                                <span className="text-sm text-gray-600">{item.plataforma}</span>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <div className="w-20 bg-gray-200 rounded-full h-2">
-                                  <div
-                                    className="bg-purple-500 h-2 rounded-full transition-all duration-500"
-                                    style={{
-                                      width: `${userStats.totalTickets > 0 ? (item.count / userStats.totalTickets) * 100 : 0}%`,
-                                    }}
-                                  ></div>
-                                </div>
-                                <span className="text-sm font-medium text-gray-800 w-8 text-right">{item.count}</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Por Departamento */}
-                    {userStats.porDepartamento.length > 0 && (
-                      <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-4">🏷️ Por Departamento</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {userStats.porDepartamento.map((item, index) => (
-                            <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                              <div className="flex items-center space-x-2">
-                                <span className="text-lg">{getDepartmentEmoji(item.departamento)}</span>
-                                <span className="text-sm text-gray-600">{item.departamento}</span>
-                              </div>
-                              <span className="text-sm font-medium text-gray-800 bg-white px-2 py-1 rounded">
-                                {item.count}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Tickets Recentes */}
-                    {userStats.ticketsRecentes.length > 0 && (
-                      <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-4">🕒 Tickets Recentes</h3>
-                        <div className="space-y-3">
-                          {userStats.ticketsRecentes.map((ticket) => (
-                            <div
-                              key={ticket.id}
-                              className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                            >
-                              <div className="flex-1">
-                                <div className="flex items-center space-x-2 mb-1">
-                                  <span className="font-medium text-gray-800">🏢 {ticket.empresa}</span>
-                                  {ticket.emImplementacao && <span className="text-orange-500">⚙️</span>}
-                                </div>
-                                <p className="text-sm text-gray-600 truncate">{ticket.descricao}</p>
-                              </div>
-                              <div className="ml-4 text-right">
-                                <span
-                                  className={cn("px-2 py-1 rounded text-xs font-medium", getStatusColor(ticket.status))}
+                                <Select
+                                  value={ticket.status}
+                                  onValueChange={(value: Ticket["status"]) => handleStatusUpdate(ticket.id, value)}
                                 >
-                                  {ticket.status === "Resolvido" && "✅"}
-                                  {ticket.status === "Em Andamento" && "🔄"}
-                                  {ticket.status === "Pendente" && "⏳"} {ticket.status}
-                                </span>
-                                <p className="text-xs text-gray-500 mt-1">
-                                  {new Date(ticket.criadoEm).toLocaleDateString("pt-BR")}
-                                </p>
+                                  <SelectTrigger className="w-40">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="Aberto">Aberto</SelectItem>
+                                    <SelectItem value="Em Implementação">Em Implementação</SelectItem>
+                                    <SelectItem value="Resolvido">Resolvido</SelectItem>
+                                    <SelectItem value="Fechado">Fechado</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <Button size="sm" variant="ghost" onClick={() => setEditingStatus(null)}>
+                                  <XIcon className="h-4 w-4" />
+                                </Button>
                               </div>
+                            ) : (
+                              <>
+                                <Badge className={getStatusColor(ticket.status)}>{ticket.status}</Badge>
+                                {(currentUser.role === "Admin" || ticket.createdBy === currentUser.name) && (
+                                  <Button size="sm" variant="ghost" onClick={() => setEditingStatus(ticket.id)}>
+                                    <EditIcon className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </>
+                            )}
+                            <Badge className={getPriorityColor(ticket.priority)}>{ticket.priority}</Badge>
+                            <Badge variant="outline">{ticket.category}</Badge>
+                          </div>
+                        </div>
+
+                        <p className="text-gray-600 mb-3">{ticket.description}</p>
+
+                        <div className="flex items-center space-x-4 text-sm text-gray-500">
+                          {currentUser.role === "Admin" && (
+                            <div className="flex items-center space-x-1">
+                              <UserIcon className="h-4 w-4" />
+                              <span>{ticket.createdBy}</span>
                             </div>
-                          ))}
+                          )}
+                          <div className="flex items-center space-x-1">
+                            <CalendarIcon className="h-4 w-4" />
+                            <span>Criado: {formatDate(ticket.createdAt)}</span>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <ClockIcon className="h-4 w-4" />
+                            <span>Atualizado: {formatDate(ticket.updatedAt)}</span>
+                          </div>
                         </div>
                       </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <div className="text-6xl mb-4">📊</div>
-                    <h3 className="text-lg font-medium text-gray-800 mb-2">Dashboard Personalizado</h3>
-                    <p className="text-gray-600 mb-4">Clique em "Atualizar" para carregar suas estatísticas.</p>
-                    <button
-                      onClick={loadUserStats}
-                      className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-lg transition-colors font-medium"
-                    >
-                      📊 Carregar Dashboard
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
 
-            {/* Tab: Usuários (apenas para Supervisor) */}
-            {activeTab === "usuarios" && currentUser?.role === "Supervisor" && (
-              <div>
-                <h2 className="text-2xl font-bold text-gray-800 mb-6">👥 Gerenciar Usuários</h2>
-
-                <div className="bg-white rounded-lg shadow-md border border-gray-200">
-                  <div className="px-6 py-4 border-b border-gray-200">
-                    <h3 className="text-lg font-semibold text-gray-800">Lista de Usuários</h3>
-                  </div>
-                  <div className="divide-y divide-gray-200">
-                    {mockUsers.map((user) => (
-                      <div key={user.id} className="px-6 py-4 flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
-                          <div className="w-10 h-10 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
-                            <span className="text-white font-bold">{user.role === "Supervisor" ? "👑" : "🛠️"}</span>
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-medium text-gray-800">{user.name}</h4>
-                            <p className="text-sm text-gray-600">@{user.username}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-4">
-                          <div className="text-right">
-                            <span
-                              className={cn(
-                                "px-2 py-1 rounded-full text-xs font-medium",
-                                user.role === "Supervisor"
-                                  ? "bg-purple-100 text-purple-800"
-                                  : "bg-emerald-100 text-emerald-800",
-                              )}
+                      {currentUser.role === "Admin" && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
                             >
-                              {user.role === "Supervisor" ? "👑 Supervisor" : "🛠️ Técnico"}
-                            </span>
-                            <p className="text-xs text-gray-500 mt-1">{user.department}</p>
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {tickets.filter((t) => t.criadoPor === user.name).length} tickets
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                              <TrashIcon className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Tem certeza que deseja excluir o ticket "#{ticket.id} - {ticket.title}"? Esta ação não
+                                pode ser desfeita.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDeleteTicket(ticket.id)}
+                                className="bg-red-600 hover:bg-red-700"
+                              >
+                                Excluir
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                    </div>
                   </div>
-                </div>
-
-                <div className="mt-6">
-                  <button className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg transition-colors font-medium">
-                    ➕ Adicionar Usuário
-                  </button>
-                </div>
+                ))}
               </div>
             )}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
