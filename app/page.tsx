@@ -152,6 +152,11 @@ export default function Dashboard() {
     emImplementacao: false,
   })
 
+  // Adicionar após os outros estados
+  const [editingTicket, setEditingTicket] = useState<number | null>(null)
+  const [editStatus, setEditStatus] = useState<"Em Andamento" | "Resolvido" | "Pendente">("Em Andamento")
+  const [selectedUserFilter, setSelectedUserFilter] = useState("")
+
   // Verificar login salvo
   useEffect(() => {
     const savedUser = localStorage.getItem("currentUser")
@@ -211,7 +216,12 @@ export default function Dashboard() {
     // Simular carregamento
     await new Promise((resolve) => setTimeout(resolve, 1000))
 
-    const userTickets = tickets.filter((ticket) => ticket.criadoPor === currentUser.name)
+    // Se for supervisor e tiver usuário selecionado, filtrar por esse usuário
+    let userTickets = tickets.filter((ticket) => ticket.criadoPor === currentUser.name)
+
+    if (currentUser.role === "Supervisor" && selectedUserFilter) {
+      userTickets = tickets.filter((ticket) => ticket.criadoPor === selectedUserFilter)
+    }
 
     const stats: UserStats = {
       totalTickets: userTickets.length,
@@ -315,6 +325,27 @@ export default function Dashboard() {
       criadoPor: "",
       apenasEmImplementacao: false,
     })
+  }
+
+  // Função para excluir ticket (apenas admin)
+  const handleDeleteTicket = (ticketId: number) => {
+    if (currentUser?.role === "Supervisor" && confirm("Tem certeza que deseja excluir este ticket?")) {
+      setTickets(tickets.filter((t) => t.id !== ticketId))
+      alert("Ticket excluído com sucesso!")
+    }
+  }
+
+  // Função para editar status do ticket
+  const handleEditStatus = (ticketId: number, newStatus: "Em Andamento" | "Resolvido" | "Pendente") => {
+    setTickets(tickets.map((ticket) => (ticket.id === ticketId ? { ...ticket, status: newStatus } : ticket)))
+    setEditingTicket(null)
+    alert("Status atualizado com sucesso!")
+  }
+
+  // Função para iniciar edição
+  const startEditing = (ticketId: number, currentStatus: "Em Andamento" | "Resolvido" | "Pendente") => {
+    setEditingTicket(ticketId)
+    setEditStatus(currentStatus)
   }
 
   // Função para obter cor do status
@@ -881,14 +912,69 @@ export default function Dashboard() {
                             </span>
                           </div>
                         </div>
-                        <div className="ml-4">
-                          <span
-                            className={cn("px-3 py-1 rounded-full text-sm font-medium", getStatusColor(ticket.status))}
-                          >
-                            {ticket.status === "Resolvido" && "✅"}
-                            {ticket.status === "Em Andamento" && "🔄"}
-                            {ticket.status === "Pendente" && "⏳"} {ticket.status}
-                          </span>
+                        <div className="ml-4 flex flex-col items-end space-y-2">
+                          {editingTicket === ticket.id ? (
+                            <div className="flex items-center space-x-2">
+                              <select
+                                value={editStatus}
+                                onChange={(e) =>
+                                  setEditStatus(e.target.value as "Em Andamento" | "Resolvido" | "Pendente")
+                                }
+                                className="px-2 py-1 border border-gray-300 rounded text-sm"
+                              >
+                                <option value="Em Andamento">🔄 Em Andamento</option>
+                                <option value="Resolvido">✅ Resolvido</option>
+                                <option value="Pendente">⏳ Pendente</option>
+                              </select>
+                              <button
+                                onClick={() => handleEditStatus(ticket.id, editStatus)}
+                                className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs"
+                              >
+                                ✅
+                              </button>
+                              <button
+                                onClick={() => setEditingTicket(null)}
+                                className="bg-gray-500 hover:bg-gray-600 text-white px-2 py-1 rounded text-xs"
+                              >
+                                ❌
+                              </button>
+                            </div>
+                          ) : (
+                            <span
+                              className={cn(
+                                "px-3 py-1 rounded-full text-sm font-medium",
+                                getStatusColor(ticket.status),
+                              )}
+                            >
+                              {ticket.status === "Resolvido" && "✅"}
+                              {ticket.status === "Em Andamento" && "🔄"}
+                              {ticket.status === "Pendente" && "⏳"} {ticket.status}
+                            </span>
+                          )}
+
+                          <div className="flex space-x-1">
+                            {/* Botão de editar status - apenas para o criador do ticket */}
+                            {currentUser?.name === ticket.criadoPor && editingTicket !== ticket.id && (
+                              <button
+                                onClick={() => startEditing(ticket.id, ticket.status)}
+                                className="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs"
+                                title="Editar status"
+                              >
+                                ✏️
+                              </button>
+                            )}
+
+                            {/* Botão de excluir - apenas para admin */}
+                            {currentUser?.role === "Supervisor" && (
+                              <button
+                                onClick={() => handleDeleteTicket(ticket.id)}
+                                className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs"
+                                title="Excluir ticket"
+                              >
+                                🗑️
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -909,13 +995,36 @@ export default function Dashboard() {
             {activeTab === "dashboard" && (
               <div>
                 <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-800">📊 Dashboard Pessoal - {currentUser?.name}</h2>
-                  <button
-                    onClick={loadUserStats}
-                    className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
-                  >
-                    🔄 Atualizar
-                  </button>
+                  <h2 className="text-2xl font-bold text-gray-800">
+                    📊 Dashboard Pessoal - {selectedUserFilter || currentUser?.name}
+                  </h2>
+                  <div className="flex items-center space-x-4">
+                    {currentUser?.role === "Supervisor" && (
+                      <div className="flex items-center space-x-2">
+                        <label className="text-sm font-medium text-gray-700">👤 Filtrar por usuário:</label>
+                        <select
+                          value={selectedUserFilter}
+                          onChange={(e) => setSelectedUserFilter(e.target.value)}
+                          className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
+                        >
+                          <option value="">Meus tickets</option>
+                          {mockUsers
+                            .filter((u) => u.role === "Tecnico")
+                            .map((user) => (
+                              <option key={user.id} value={user.name}>
+                                {user.name}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                    )}
+                    <button
+                      onClick={loadUserStats}
+                      className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
+                    >
+                      🔄 Atualizar
+                    </button>
+                  </div>
                 </div>
 
                 {loadingStats ? (
