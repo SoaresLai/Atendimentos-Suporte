@@ -669,26 +669,6 @@ export default function Dashboard() {
               🚀 Entrar
             </button>
           </form>
-
-          <div className="mt-8 p-4 bg-gray-50 rounded-lg">
-            <p className="text-sm text-gray-600 mb-2">
-              🧪 <strong>Credenciais de teste:</strong>
-            </p>
-            <div className="text-xs text-gray-500 space-y-1">
-              <div>
-                👑 <strong>Supervisor:</strong> admin / 123456
-              </div>
-              <div>
-                🛠️ <strong>Técnico:</strong> tecnico1 / 123456
-              </div>
-              <div>
-                🛠️ <strong>Técnico:</strong> tecnico2 / 123456
-              </div>
-              <div>
-                🛠️ <strong>Técnico:</strong> tecnico3 / 123456
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     )
