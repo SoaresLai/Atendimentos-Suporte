@@ -1,10 +1,13 @@
 import type React from "react"
 import type { Metadata } from "next"
+import { Inter } from "next/font/google"
 import "./globals.css"
 
+const inter = Inter({ subsets: ["latin"] })
+
 export const metadata: Metadata = {
-  title: "Sistema de Suporte - Dashboard",
-  description: "Dashboard para gerenciamento de tickets de suporte",
+  title: "Sistema de Suporte",
+  description: "Dashboard de acompanhamento de tickets de suporte",
     generator: 'v0.dev'
 }
 
@@ -15,9 +18,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR">
-      <body className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 font-sans antialiased">
-        {children}
-      </body>
+      <body className={inter.className}>{children}</body>
     </html>
   )
 }

@@ -1,9 +1,12 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
-import { cn } from "@/lib/utils"
+
+// Função utilitária para classes CSS
+function cn(...classes: string[]) {
+  return classes.filter(Boolean).join(" ")
+}
 
 // Tipos
 interface User {
@@ -21,7 +24,7 @@ interface Ticket {
   departamento: string
   descricao: string
   status: "Em Andamento" | "Resolvido" | "Pendente"
-  importante: boolean
+  emImplementacao: boolean
   criadoPor: string
   criadoEm: string
 }
@@ -31,6 +34,7 @@ interface UserStats {
   resolvidos: number
   pendentes: number
   emAndamento: number
+  emImplementacao: number
   ticketsRecentes: Ticket[]
   atividadeMensal: { mes: string; tickets: number }[]
   porPlataforma: { plataforma: string; count: number }[]
@@ -53,7 +57,7 @@ const mockTickets: Ticket[] = [
     departamento: "Criação",
     descricao: "Problema com integração de API",
     status: "Em Andamento",
-    importante: true,
+    emImplementacao: true,
     criadoPor: "Maria Santos",
     criadoEm: "2024-01-15T10:30:00",
   },
@@ -64,7 +68,7 @@ const mockTickets: Ticket[] = [
     departamento: "Precificação",
     descricao: "Erro no cálculo de preços",
     status: "Resolvido",
-    importante: false,
+    emImplementacao: false,
     criadoPor: "Pedro Costa",
     criadoEm: "2024-01-14T14:20:00",
   },
@@ -75,7 +79,7 @@ const mockTickets: Ticket[] = [
     departamento: "Fluxos",
     descricao: "Configuração de workflow",
     status: "Pendente",
-    importante: true,
+    emImplementacao: true,
     criadoPor: "Ana Oliveira",
     criadoEm: "2024-01-13T09:15:00",
   },
@@ -86,7 +90,7 @@ const mockTickets: Ticket[] = [
     departamento: "Criação",
     descricao: "Customização de template",
     status: "Em Andamento",
-    importante: false,
+    emImplementacao: false,
     criadoPor: "Maria Santos",
     criadoEm: "2024-01-12T16:45:00",
   },
@@ -97,7 +101,7 @@ const mockTickets: Ticket[] = [
     departamento: "Precificação",
     descricao: "Integração com sistema de pagamento",
     status: "Resolvido",
-    importante: true,
+    emImplementacao: true,
     criadoPor: "Pedro Costa",
     criadoEm: "2024-01-11T11:30:00",
   },
@@ -107,11 +111,11 @@ const departamentos = [
   "Criação",
   "Precificação",
   "Fluxos",
-  "Integração",
+  "Automações",
+  "Reunião",
+  "TechLead",
   "Suporte",
-  "Vendas",
-  "Marketing",
-  "Financeiro",
+  "Engenharia",
 ]
 
 export default function Dashboard() {
@@ -136,7 +140,7 @@ export default function Dashboard() {
     dataInicial: "",
     dataFinal: "",
     criadoPor: "",
-    apenasImportantes: false,
+    apenasEmImplementacao: false,
   })
 
   // Estados do formulário de novo ticket
@@ -145,7 +149,7 @@ export default function Dashboard() {
     plataforma: "INTERCOM" as "INTERCOM" | "GRONERZAP",
     departamento: "",
     descricao: "",
-    importante: false,
+    emImplementacao: false,
   })
 
   // Verificar login salvo
@@ -183,8 +187,8 @@ export default function Dashboard() {
       filtered = filtered.filter((ticket) => ticket.criadoPor.toLowerCase().includes(filters.criadoPor.toLowerCase()))
     }
 
-    if (filters.apenasImportantes) {
-      filtered = filtered.filter((ticket) => ticket.importante)
+    if (filters.apenasEmImplementacao) {
+      filtered = filtered.filter((ticket) => ticket.emImplementacao)
     }
 
     if (filters.dataInicial) {
@@ -214,6 +218,7 @@ export default function Dashboard() {
       resolvidos: userTickets.filter((t) => t.status === "Resolvido").length,
       pendentes: userTickets.filter((t) => t.status === "Pendente").length,
       emAndamento: userTickets.filter((t) => t.status === "Em Andamento").length,
+      emImplementacao: userTickets.filter((t) => t.emImplementacao).length,
       ticketsRecentes: userTickets.slice(0, 5),
       atividadeMensal: [
         { mes: "Ago", tickets: 12 },
@@ -281,7 +286,7 @@ export default function Dashboard() {
       departamento: newTicket.departamento,
       descricao: newTicket.descricao,
       status: "Em Andamento",
-      importante: newTicket.importante,
+      emImplementacao: newTicket.emImplementacao,
       criadoPor: currentUser.name,
       criadoEm: new Date().toISOString(),
     }
@@ -292,7 +297,7 @@ export default function Dashboard() {
       plataforma: "INTERCOM",
       departamento: "",
       descricao: "",
-      importante: false,
+      emImplementacao: false,
     })
 
     alert("Ticket criado com sucesso!")
@@ -308,7 +313,7 @@ export default function Dashboard() {
       dataInicial: "",
       dataFinal: "",
       criadoPor: "",
-      apenasImportantes: false,
+      apenasEmImplementacao: false,
     })
   }
 
@@ -332,21 +337,30 @@ export default function Dashboard() {
       Criação: "🎨",
       Precificação: "💰",
       Fluxos: "🔄",
-      Integração: "🔗",
+      Automações: "🤖",
+      Reunião: "🤝",
+      TechLead: "👨‍💻",
       Suporte: "🛠️",
-      Vendas: "💼",
-      Marketing: "📢",
-      Financeiro: "📊",
+      Engenharia: "⚙️",
     }
     return emojis[dept] || "📋"
   }
 
+  // Cálculos das métricas gerais
+  const totalAtendimentos = filteredTickets.length
+  const resolvidos = filteredTickets.filter((t) => t.status === "Resolvido").length
+  const naoResolvidos = filteredTickets.filter((t) => t.status !== "Resolvido").length
+  const intercom = filteredTickets.filter((t) => t.plataforma === "INTERCOM").length
+  const gronerzap = filteredTickets.filter((t) => t.plataforma === "GRONERZAP").length
+  const conclusaoPercent = totalAtendimentos > 0 ? Math.round((resolvidos / totalAtendimentos) * 100) : 0
+  const emImplementacao = filteredTickets.filter((t) => t.emImplementacao).length
+
   if (!isLoggedIn) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100 flex items-center justify-center p-4">
         <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl p-8 w-full max-w-md border border-white/20">
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center mx-auto mb-4">
               <span className="text-2xl">🔒</span>
             </div>
             <h1 className="text-2xl font-bold text-gray-800 mb-2">Sistema de Suporte</h1>
@@ -360,7 +374,7 @@ export default function Dashboard() {
                 type="text"
                 value={loginForm.username}
                 onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                 placeholder="Digite seu usuário"
                 required
               />
@@ -372,7 +386,7 @@ export default function Dashboard() {
                 type="password"
                 value={loginForm.password}
                 onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                 placeholder="Digite sua senha"
                 required
               />
@@ -384,7 +398,7 @@ export default function Dashboard() {
                 id="remember"
                 checked={loginForm.remember}
                 onChange={(e) => setLoginForm({ ...loginForm, remember: e.target.checked })}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
               />
               <label htmlFor="remember" className="ml-2 block text-sm text-gray-700">
                 Lembrar-me
@@ -397,7 +411,7 @@ export default function Dashboard() {
 
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 px-4 rounded-lg hover:from-blue-600 hover:to-indigo-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all font-medium"
+              className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 text-white py-3 px-4 rounded-lg hover:from-emerald-600 hover:to-teal-700 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition-all font-medium"
             >
               🚀 Entrar
             </button>
@@ -428,18 +442,18 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100">
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-lg border-b border-white/20 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+              <div className="w-10 h-10 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold">📊</span>
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-800">Sistema de Suporte</h1>
-                <p className="text-sm text-gray-600">Dashboard de Tickets</p>
+                <h1 className="text-xl font-bold text-gray-800">Sistema de Acompanhamento - Suporte</h1>
+                <p className="text-sm text-gray-600">Gerencie tickets e acompanhe métricas em tempo real</p>
               </div>
             </div>
 
@@ -464,6 +478,103 @@ export default function Dashboard() {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Dashboard de Métricas Gerais */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-white/20">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Atendimentos</p>
+                <p className="text-3xl font-bold text-gray-800">{totalAtendimentos}</p>
+                {filteredTickets.length !== tickets.length && (
+                  <p className="text-xs text-gray-500">{tickets.length} total</p>
+                )}
+              </div>
+              <span className="text-3xl">📊</span>
+            </div>
+          </div>
+
+          <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-white/20">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Resolvidos</p>
+                <p className="text-3xl font-bold text-green-600">{resolvidos}</p>
+              </div>
+              <span className="text-3xl">✅</span>
+            </div>
+          </div>
+
+          <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-white/20">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Não Resolvidos</p>
+                <p className="text-3xl font-bold text-red-600">{naoResolvidos}</p>
+              </div>
+              <span className="text-3xl">⚠️</span>
+            </div>
+          </div>
+
+          <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-white/20">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Taxa de Conclusão</p>
+                <p className="text-3xl font-bold text-emerald-600">{conclusaoPercent}%</p>
+                <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                  <div
+                    className="bg-emerald-500 h-2 rounded-full transition-all duration-500"
+                    style={{ width: `${conclusaoPercent}%` }}
+                  ></div>
+                </div>
+              </div>
+              <span className="text-3xl">📈</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Balanços por Plataforma */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-white/20">
+            <h3 className="text-lg font-semibold text-gray-800 mb-2 flex items-center gap-2">
+              <span>💬</span> Intercom
+            </h3>
+            <div className="text-3xl font-bold text-blue-600">{intercom}</div>
+          </div>
+
+          <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-white/20">
+            <h3 className="text-lg font-semibold text-gray-800 mb-2 flex items-center gap-2">
+              <span>📱</span> GronerZap
+            </h3>
+            <div className="text-3xl font-bold text-green-600">{gronerzap}</div>
+          </div>
+
+          <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-white/20">
+            <h3 className="text-lg font-semibold text-gray-800 mb-2 flex items-center gap-2">
+              <span>⚙️</span> Em Implementação
+            </h3>
+            <div className="text-3xl font-bold text-orange-600">{emImplementacao}</div>
+          </div>
+        </div>
+
+        {/* Departamentos */}
+        <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-white/20 mb-8">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <span>🏢</span> Distribuição por Departamento
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {departamentos.map((dept) => {
+              const count = filteredTickets.filter((t) => t.departamento === dept).length
+              return (
+                <div key={dept} className="text-center p-3 rounded-lg bg-gray-50">
+                  <div className="text-sm font-medium text-gray-600 flex items-center justify-center gap-1">
+                    <span>{getDepartmentEmoji(dept)}</span>
+                    {dept}
+                  </div>
+                  <div className="text-2xl font-bold mt-1">{count}</div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
         {/* Tabs */}
         <div className="bg-white/80 backdrop-blur-lg rounded-xl shadow-lg border border-white/20 mb-8">
           <div className="border-b border-gray-200">
@@ -474,7 +585,7 @@ export default function Dashboard() {
                   className={cn(
                     "py-4 px-2 border-b-2 font-medium text-sm transition-colors",
                     activeTab === "novo"
-                      ? "border-blue-500 text-blue-600"
+                      ? "border-emerald-500 text-emerald-600"
                       : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300",
                   )}
                 >
@@ -487,12 +598,12 @@ export default function Dashboard() {
                 className={cn(
                   "py-4 px-2 border-b-2 font-medium text-sm transition-colors",
                   activeTab === "tickets"
-                    ? "border-blue-500 text-blue-600"
+                    ? "border-emerald-500 text-emerald-600"
                     : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300",
                 )}
               >
                 📋 Lista de Tickets
-                <span className="ml-2 bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                <span className="ml-2 bg-emerald-100 text-emerald-800 text-xs px-2 py-1 rounded-full">
                   {filteredTickets.length}
                 </span>
               </button>
@@ -505,7 +616,7 @@ export default function Dashboard() {
                 className={cn(
                   "py-4 px-2 border-b-2 font-medium text-sm transition-colors",
                   activeTab === "dashboard"
-                    ? "border-blue-500 text-blue-600"
+                    ? "border-emerald-500 text-emerald-600"
                     : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300",
                 )}
               >
@@ -518,7 +629,7 @@ export default function Dashboard() {
                   className={cn(
                     "py-4 px-2 border-b-2 font-medium text-sm transition-colors",
                     activeTab === "usuarios"
-                      ? "border-blue-500 text-blue-600"
+                      ? "border-emerald-500 text-emerald-600"
                       : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300",
                   )}
                 >
@@ -545,7 +656,7 @@ export default function Dashboard() {
                         type="text"
                         value={newTicket.empresa}
                         onChange={(e) => setNewTicket({ ...newTicket, empresa: e.target.value })}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                         placeholder="Nome da empresa"
                         required
                       />
@@ -558,7 +669,7 @@ export default function Dashboard() {
                         onChange={(e) =>
                           setNewTicket({ ...newTicket, plataforma: e.target.value as "INTERCOM" | "GRONERZAP" })
                         }
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                       >
                         <option value="INTERCOM">💬 INTERCOM</option>
                         <option value="GRONERZAP">📱 GRONERZAP</option>
@@ -570,7 +681,7 @@ export default function Dashboard() {
                       <select
                         value={newTicket.departamento}
                         onChange={(e) => setNewTicket({ ...newTicket, departamento: e.target.value })}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                         required
                       >
                         <option value="">Selecione um departamento</option>
@@ -585,13 +696,13 @@ export default function Dashboard() {
                     <div className="flex items-center">
                       <input
                         type="checkbox"
-                        id="importante"
-                        checked={newTicket.importante}
-                        onChange={(e) => setNewTicket({ ...newTicket, importante: e.target.checked })}
-                        className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                        id="emImplementacao"
+                        checked={newTicket.emImplementacao}
+                        onChange={(e) => setNewTicket({ ...newTicket, emImplementacao: e.target.checked })}
+                        className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
                       />
-                      <label htmlFor="importante" className="ml-2 block text-sm text-gray-700">
-                        ⚠️ Marcar como importante
+                      <label htmlFor="emImplementacao" className="ml-2 block text-sm text-gray-700">
+                        ⚙️ Marcar como em implementação
                       </label>
                     </div>
                   </div>
@@ -602,7 +713,7 @@ export default function Dashboard() {
                       value={newTicket.descricao}
                       onChange={(e) => setNewTicket({ ...newTicket, descricao: e.target.value })}
                       rows={4}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                       placeholder="Descreva detalhadamente o problema ou solicitação..."
                       required
                     />
@@ -610,7 +721,7 @@ export default function Dashboard() {
 
                   <button
                     type="submit"
-                    className="bg-gradient-to-r from-green-500 to-green-600 text-white px-6 py-3 rounded-lg hover:from-green-600 hover:to-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all font-medium"
+                    className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-6 py-3 rounded-lg hover:from-emerald-600 hover:to-teal-700 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition-all font-medium"
                   >
                     ✅ Criar Ticket
                   </button>
@@ -639,7 +750,7 @@ export default function Dashboard() {
                         type="text"
                         value={filters.empresa}
                         onChange={(e) => setFilters({ ...filters, empresa: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
                         placeholder="Buscar empresa..."
                       />
                     </div>
@@ -649,7 +760,7 @@ export default function Dashboard() {
                       <select
                         value={filters.plataforma}
                         onChange={(e) => setFilters({ ...filters, plataforma: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
                       >
                         <option value="">Todas</option>
                         <option value="INTERCOM">💬 INTERCOM</option>
@@ -662,7 +773,7 @@ export default function Dashboard() {
                       <select
                         value={filters.status}
                         onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
                       >
                         <option value="">Todos</option>
                         <option value="Em Andamento">🔄 Em Andamento</option>
@@ -676,7 +787,7 @@ export default function Dashboard() {
                       <select
                         value={filters.departamento}
                         onChange={(e) => setFilters({ ...filters, departamento: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
                       >
                         <option value="">Todos</option>
                         {departamentos.map((dept) => (
@@ -693,7 +804,7 @@ export default function Dashboard() {
                         type="date"
                         value={filters.dataInicial}
                         onChange={(e) => setFilters({ ...filters, dataInicial: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
                       />
                     </div>
 
@@ -703,7 +814,7 @@ export default function Dashboard() {
                         type="date"
                         value={filters.dataFinal}
                         onChange={(e) => setFilters({ ...filters, dataFinal: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
                       />
                     </div>
 
@@ -713,7 +824,7 @@ export default function Dashboard() {
                         type="text"
                         value={filters.criadoPor}
                         onChange={(e) => setFilters({ ...filters, criadoPor: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
                         placeholder="Nome do usuário..."
                       />
                     </div>
@@ -722,11 +833,11 @@ export default function Dashboard() {
                       <label className="flex items-center">
                         <input
                           type="checkbox"
-                          checked={filters.apenasImportantes}
-                          onChange={(e) => setFilters({ ...filters, apenasImportantes: e.target.checked })}
-                          className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                          checked={filters.apenasEmImplementacao}
+                          onChange={(e) => setFilters({ ...filters, apenasEmImplementacao: e.target.checked })}
+                          className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
                         />
-                        <span className="ml-2 text-sm text-gray-700">⚠️ Apenas Importantes</span>
+                        <span className="ml-2 text-sm text-gray-700">⚙️ Apenas Em Implementação</span>
                       </label>
                     </div>
                   </div>
@@ -750,9 +861,9 @@ export default function Dashboard() {
                         <div className="flex-1">
                           <div className="flex items-center space-x-3 mb-2">
                             <h3 className="text-lg font-semibold text-gray-800">🏢 {ticket.empresa}</h3>
-                            {ticket.importante && (
-                              <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full font-medium">
-                                ⚠️ Importante
+                            {ticket.emImplementacao && (
+                              <span className="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full font-medium">
+                                ⚙️ Em Implementação
                               </span>
                             )}
                           </div>
@@ -798,10 +909,10 @@ export default function Dashboard() {
             {activeTab === "dashboard" && (
               <div>
                 <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-800">📊 Meu Dashboard</h2>
+                  <h2 className="text-2xl font-bold text-gray-800">📊 Dashboard Pessoal - {currentUser?.name}</h2>
                   <button
                     onClick={loadUserStats}
-                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
+                    className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
                   >
                     🔄 Atualizar
                   </button>
@@ -809,13 +920,13 @@ export default function Dashboard() {
 
                 {loadingStats ? (
                   <div className="flex justify-center items-center py-12">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
                     <span className="ml-3 text-gray-600">Carregando estatísticas...</span>
                   </div>
                 ) : userStats ? (
                   <div className="space-y-6">
                     {/* Cards de Métricas */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
                       <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
                         <div className="flex items-center justify-between">
                           <div>
@@ -855,6 +966,16 @@ export default function Dashboard() {
                           <div className="text-3xl">⏳</div>
                         </div>
                       </div>
+
+                      <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-gray-600">Em Implementação</p>
+                            <p className="text-3xl font-bold text-orange-600">{userStats.emImplementacao}</p>
+                          </div>
+                          <div className="text-3xl">⚙️</div>
+                        </div>
+                      </div>
                     </div>
 
                     {/* Gráficos */}
@@ -869,7 +990,7 @@ export default function Dashboard() {
                               <div className="flex items-center space-x-2 flex-1 mx-4">
                                 <div className="flex-1 bg-gray-200 rounded-full h-2">
                                   <div
-                                    className="bg-blue-500 h-2 rounded-full transition-all duration-500"
+                                    className="bg-emerald-500 h-2 rounded-full transition-all duration-500"
                                     style={{
                                       width: `${(item.tickets / Math.max(...userStats.atividadeMensal.map((i) => i.tickets))) * 100}%`,
                                     }}
@@ -896,7 +1017,9 @@ export default function Dashboard() {
                                 <div className="w-20 bg-gray-200 rounded-full h-2">
                                   <div
                                     className="bg-purple-500 h-2 rounded-full transition-all duration-500"
-                                    style={{ width: `${(item.count / userStats.totalTickets) * 100}%` }}
+                                    style={{
+                                      width: `${userStats.totalTickets > 0 ? (item.count / userStats.totalTickets) * 100 : 0}%`,
+                                    }}
                                   ></div>
                                 </div>
                                 <span className="text-sm font-medium text-gray-800 w-8 text-right">{item.count}</span>
@@ -940,7 +1063,7 @@ export default function Dashboard() {
                               <div className="flex-1">
                                 <div className="flex items-center space-x-2 mb-1">
                                   <span className="font-medium text-gray-800">🏢 {ticket.empresa}</span>
-                                  {ticket.importante && <span className="text-red-500">⚠️</span>}
+                                  {ticket.emImplementacao && <span className="text-orange-500">⚙️</span>}
                                 </div>
                                 <p className="text-sm text-gray-600 truncate">{ticket.descricao}</p>
                               </div>
@@ -969,7 +1092,7 @@ export default function Dashboard() {
                     <p className="text-gray-600 mb-4">Clique em "Atualizar" para carregar suas estatísticas.</p>
                     <button
                       onClick={loadUserStats}
-                      className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition-colors font-medium"
+                      className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-lg transition-colors font-medium"
                     >
                       📊 Carregar Dashboard
                     </button>
@@ -991,7 +1114,7 @@ export default function Dashboard() {
                     {mockUsers.map((user) => (
                       <div key={user.id} className="px-6 py-4 flex items-center justify-between">
                         <div className="flex items-center space-x-4">
-                          <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                          <div className="w-10 h-10 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
                             <span className="text-white font-bold">{user.role === "Supervisor" ? "👑" : "🛠️"}</span>
                           </div>
                           <div>
@@ -1006,16 +1129,15 @@ export default function Dashboard() {
                                 "px-2 py-1 rounded-full text-xs font-medium",
                                 user.role === "Supervisor"
                                   ? "bg-purple-100 text-purple-800"
-                                  : "bg-blue-100 text-blue-800",
+                                  : "bg-emerald-100 text-emerald-800",
                               )}
                             >
                               {user.role === "Supervisor" ? "👑 Supervisor" : "🛠️ Técnico"}
                             </span>
                             <p className="text-xs text-gray-500 mt-1">{user.department}</p>
                           </div>
-                          <div className="flex space-x-2">
-                            <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">✏️ Editar</button>
-                            <button className="text-red-600 hover:text-red-800 text-sm font-medium">🗑️ Remover</button>
+                          <div className="text-sm text-gray-500">
+                            {tickets.filter((t) => t.criadoPor === user.name).length} tickets
                           </div>
                         </div>
                       </div>
@@ -1024,7 +1146,7 @@ export default function Dashboard() {
                 </div>
 
                 <div className="mt-6">
-                  <button className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors font-medium">
+                  <button className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg transition-colors font-medium">
                     ➕ Adicionar Usuário
                   </button>
                 </div>
