@@ -7,7 +7,7 @@ const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: "Sistema de Suporte - Dashboard",
-  description: "Sistema de acompanhamento e gerenciamento de tickets de suporte",
+  description: "Sistema de acompanhamento e gerenciamento de tickets de suporte integrado com Supabase",
     generator: 'v0.dev'
 }
 

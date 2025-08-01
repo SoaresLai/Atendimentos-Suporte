@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
+import { userService, ticketService } from "@/lib/supabase"
 
 // Função utilitária para classes CSS
 function cn(...classes: string[]) {
@@ -24,9 +25,11 @@ interface Ticket {
   departamento: string
   descricao: string
   status: "Em Andamento" | "Resolvido" | "Pendente"
-  emImplementacao: boolean
-  criadoPor: string
-  criadoEm: string
+  em_implementacao: boolean
+  criado_por: string
+  criado_em: string
+  atualizado_em?: string
+  atualizado_por?: string
 }
 
 interface UserStats {
@@ -40,183 +43,6 @@ interface UserStats {
   porPlataforma: { plataforma: string; count: number }[]
   porDepartamento: { departamento: string; count: number }[]
 }
-
-// Dados mockados
-const mockUsers: User[] = [
-  { id: 1, username: "admin", name: "João Silva", role: "Supervisor", department: "Geral" },
-  { id: 2, username: "tecnico1", name: "Maria Santos", role: "Tecnico", department: "Criação" },
-  { id: 3, username: "tecnico2", name: "Pedro Costa", role: "Tecnico", department: "Precificação" },
-  { id: 4, username: "tecnico3", name: "Ana Oliveira", role: "Tecnico", department: "Fluxos" },
-]
-
-const mockTickets: Ticket[] = [
-  {
-    id: 1,
-    empresa: "Tech Solutions Ltda",
-    plataforma: "INTERCOM",
-    departamento: "Criação",
-    descricao: "Problema com integração de API",
-    status: "Em Andamento",
-    emImplementacao: true,
-    criadoPor: "Maria Santos",
-    criadoEm: "2024-01-15T10:30:00",
-  },
-  {
-    id: 2,
-    empresa: "Inovação Digital",
-    plataforma: "GRONERZAP",
-    departamento: "Precificação",
-    descricao: "Erro no cálculo de preços",
-    status: "Resolvido",
-    emImplementacao: false,
-    criadoPor: "Pedro Costa",
-    criadoEm: "2024-01-14T14:20:00",
-  },
-  {
-    id: 3,
-    empresa: "StartUp ABC",
-    plataforma: "INTERCOM",
-    departamento: "Fluxos",
-    descricao: "Configuração de workflow",
-    status: "Pendente",
-    emImplementacao: true,
-    criadoPor: "Ana Oliveira",
-    criadoEm: "2024-01-13T09:15:00",
-  },
-  {
-    id: 4,
-    empresa: "Empresa XYZ",
-    plataforma: "GRONERZAP",
-    departamento: "Criação",
-    descricao: "Customização de template",
-    status: "Em Andamento",
-    emImplementacao: false,
-    criadoPor: "Maria Santos",
-    criadoEm: "2024-01-12T16:45:00",
-  },
-  {
-    id: 5,
-    empresa: "Global Corp",
-    plataforma: "INTERCOM",
-    departamento: "Precificação",
-    descricao: "Integração com sistema de pagamento",
-    status: "Resolvido",
-    emImplementacao: true,
-    criadoPor: "Pedro Costa",
-    criadoEm: "2024-01-11T11:30:00",
-  },
-  {
-    id: 6,
-    empresa: "Futuro Solar",
-    plataforma: "INTERCOM",
-    departamento: "Suporte",
-    descricao: "Mensagem automática fim de expediente",
-    status: "Resolvido",
-    emImplementacao: false,
-    criadoPor: "João Silva",
-    criadoEm: "2024-01-10T09:00:00",
-  },
-  {
-    id: 7,
-    empresa: "MV2 Engenharia",
-    plataforma: "INTERCOM",
-    departamento: "Suporte",
-    descricao: "UpSell e DownSell",
-    status: "Em Andamento",
-    emImplementacao: true,
-    criadoPor: "João Silva",
-    criadoEm: "2024-01-09T14:30:00",
-  },
-  // Adicionando mais tickets com datas variadas para demonstrar a atividade mensal
-  {
-    id: 8,
-    empresa: "Solar Energy",
-    plataforma: "GRONERZAP",
-    departamento: "Automações",
-    descricao: "Configuração de bot",
-    status: "Resolvido",
-    emImplementacao: false,
-    criadoPor: "Maria Santos",
-    criadoEm: "2023-12-20T10:30:00",
-  },
-  {
-    id: 9,
-    empresa: "Tech Startup",
-    plataforma: "INTERCOM",
-    departamento: "Fluxos",
-    descricao: "Otimização de processo",
-    status: "Resolvido",
-    emImplementacao: true,
-    criadoPor: "Pedro Costa",
-    criadoEm: "2023-12-15T14:20:00",
-  },
-  {
-    id: 10,
-    empresa: "Digital Agency",
-    plataforma: "GRONERZAP",
-    departamento: "Criação",
-    descricao: "Design de templates",
-    status: "Resolvido",
-    emImplementacao: false,
-    criadoPor: "Ana Oliveira",
-    criadoEm: "2023-11-25T09:15:00",
-  },
-  {
-    id: 11,
-    empresa: "E-commerce Plus",
-    plataforma: "INTERCOM",
-    departamento: "Precificação",
-    descricao: "Sistema de descontos",
-    status: "Resolvido",
-    emImplementacao: true,
-    criadoPor: "Maria Santos",
-    criadoEm: "2023-11-10T16:45:00",
-  },
-  {
-    id: 12,
-    empresa: "Marketing Pro",
-    plataforma: "GRONERZAP",
-    departamento: "Automações",
-    descricao: "Campanhas automatizadas",
-    status: "Resolvido",
-    emImplementacao: false,
-    criadoPor: "Pedro Costa",
-    criadoEm: "2023-10-28T11:30:00",
-  },
-  {
-    id: 13,
-    empresa: "Business Solutions",
-    plataforma: "INTERCOM",
-    departamento: "Suporte",
-    descricao: "FAQ automatizado",
-    status: "Resolvido",
-    emImplementacao: true,
-    criadoPor: "João Silva",
-    criadoEm: "2023-10-15T09:00:00",
-  },
-  {
-    id: 14,
-    empresa: "Innovation Lab",
-    plataforma: "GRONERZAP",
-    departamento: "TechLead",
-    descricao: "Arquitetura de sistema",
-    status: "Resolvido",
-    emImplementacao: false,
-    criadoPor: "Ana Oliveira",
-    criadoEm: "2023-09-20T14:30:00",
-  },
-  {
-    id: 15,
-    empresa: "Growth Company",
-    plataforma: "INTERCOM",
-    departamento: "Fluxos",
-    descricao: "Processo de onboarding",
-    status: "Resolvido",
-    emImplementacao: true,
-    criadoPor: "Maria Santos",
-    criadoEm: "2023-09-05T10:30:00",
-  },
-]
 
 const departamentos = [
   "Criação",
@@ -243,7 +69,7 @@ const calculateMonthlyActivity = (tickets: Ticket[]): { mes: string; tickets: nu
 
   // Contar tickets por mês
   tickets.forEach((ticket) => {
-    const ticketDate = new Date(ticket.criadoEm)
+    const ticketDate = new Date(ticket.criado_em)
     const monthKey = ticketDate.toLocaleDateString("pt-BR", { month: "short", year: "numeric" })
 
     // Só contar se estiver nos últimos 6 meses
@@ -263,10 +89,12 @@ export default function Dashboard() {
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [activeTab, setActiveTab] = useState("")
-  const [tickets, setTickets] = useState<Ticket[]>(mockTickets)
+  const [tickets, setTickets] = useState<Ticket[]>([])
   const [filteredTickets, setFilteredTickets] = useState<Ticket[]>([])
   const [userStats, setUserStats] = useState<UserStats | null>(null)
   const [loadingStats, setLoadingStats] = useState(false)
+  const [users, setUsers] = useState<User[]>([])
+  const [loading, setLoading] = useState(false)
 
   // Estados do formulário de login
   const [loginForm, setLoginForm] = useState({ username: "", password: "", remember: false })
@@ -321,8 +149,40 @@ export default function Dashboard() {
     }
   }, [])
 
+  // Carregar dados iniciais
+  useEffect(() => {
+    if (isLoggedIn) {
+      loadTickets()
+      loadUsers()
+    }
+  }, [isLoggedIn])
+
+  // Carregar tickets
+  const loadTickets = async () => {
+    try {
+      setLoading(true)
+      const data = await ticketService.getAllTickets()
+      setTickets(data)
+    } catch (error) {
+      console.error("Erro ao carregar tickets:", error)
+      alert("Erro ao carregar tickets")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Carregar usuários
+  const loadUsers = async () => {
+    try {
+      const data = await userService.getAllUsers()
+      setUsers(data)
+    } catch (error) {
+      console.error("Erro ao carregar usuários:", error)
+    }
+  }
+
   // Função para adicionar novo usuário
-  const handleAddUser = (e: React.FormEvent) => {
+  const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault()
     setAddUserError("")
 
@@ -337,34 +197,39 @@ export default function Dashboard() {
       return
     }
 
-    if (mockUsers.find((u) => u.username === newUser.username)) {
-      setAddUserError("Nome de usuário já existe")
-      return
+    try {
+      const usernameExists = await userService.checkUsernameExists(newUser.username)
+      if (usernameExists) {
+        setAddUserError("Nome de usuário já existe")
+        return
+      }
+
+      await userService.createUser({
+        username: newUser.username,
+        name: newUser.name,
+        role: newUser.role,
+        department: newUser.department,
+        password: newUser.password,
+      })
+
+      // Recarregar lista de usuários
+      await loadUsers()
+
+      // Limpar formulário e fechar modal
+      setNewUser({
+        username: "",
+        name: "",
+        role: "Tecnico",
+        department: "",
+        password: "",
+        confirmPassword: "",
+      })
+      setShowAddUserModal(false)
+      alert("Usuário adicionado com sucesso!")
+    } catch (error) {
+      console.error("Erro ao adicionar usuário:", error)
+      setAddUserError("Erro ao adicionar usuário")
     }
-
-    // Criar novo usuário
-    const user: User = {
-      id: mockUsers.length + 1,
-      username: newUser.username,
-      name: newUser.name,
-      role: newUser.role,
-      department: newUser.department,
-    }
-
-    // Adicionar à lista (em uma aplicação real, isso seria uma chamada à API)
-    mockUsers.push(user)
-
-    // Limpar formulário e fechar modal
-    setNewUser({
-      username: "",
-      name: "",
-      role: "Tecnico",
-      department: "",
-      password: "",
-      confirmPassword: "",
-    })
-    setShowAddUserModal(false)
-    alert("Usuário adicionado com sucesso!")
   }
 
   // Função para fechar modal
@@ -383,50 +248,30 @@ export default function Dashboard() {
 
   // Aplicar filtros baseados no usuário e filtros selecionados
   useEffect(() => {
-    if (!currentUser) return
+    if (!currentUser || tickets.length === 0) return
 
-    // Primeiro, filtrar por usuário se for técnico
-    let baseTickets = tickets
-    if (currentUser.role === "Tecnico") {
-      baseTickets = tickets.filter((ticket) => ticket.criadoPor === currentUser.name)
+    const applyFilters = async () => {
+      try {
+        const data = await ticketService.getFilteredTickets({
+          empresa: filters.empresa,
+          plataforma: filters.plataforma,
+          status: filters.status,
+          departamento: filters.departamento,
+          dataInicial: filters.dataInicial,
+          dataFinal: filters.dataFinal,
+          criadoPor: filters.criadoPor,
+          apenasEmImplementacao: filters.apenasEmImplementacao,
+          userRole: currentUser.role,
+          userName: currentUser.name,
+        })
+        setFilteredTickets(data)
+      } catch (error) {
+        console.error("Erro ao filtrar tickets:", error)
+        setFilteredTickets([])
+      }
     }
 
-    // Depois aplicar os filtros adicionais
-    let filtered = baseTickets
-
-    if (filters.empresa) {
-      filtered = filtered.filter((ticket) => ticket.empresa.toLowerCase().includes(filters.empresa.toLowerCase()))
-    }
-
-    if (filters.plataforma) {
-      filtered = filtered.filter((ticket) => ticket.plataforma === filters.plataforma)
-    }
-
-    if (filters.status) {
-      filtered = filtered.filter((ticket) => ticket.status === filters.status)
-    }
-
-    if (filters.departamento) {
-      filtered = filtered.filter((ticket) => ticket.departamento === filters.departamento)
-    }
-
-    if (filters.criadoPor) {
-      filtered = filtered.filter((ticket) => ticket.criadoPor.toLowerCase().includes(filters.criadoPor.toLowerCase()))
-    }
-
-    if (filters.apenasEmImplementacao) {
-      filtered = filtered.filter((ticket) => ticket.emImplementacao)
-    }
-
-    if (filters.dataInicial) {
-      filtered = filtered.filter((ticket) => new Date(ticket.criadoEm) >= new Date(filters.dataInicial))
-    }
-
-    if (filters.dataFinal) {
-      filtered = filtered.filter((ticket) => new Date(ticket.criadoEm) <= new Date(filters.dataFinal))
-    }
-
-    setFilteredTickets(filtered)
+    applyFilters()
   }, [filters, tickets, currentUser])
 
   // Carregar estatísticas do usuário
@@ -435,65 +280,75 @@ export default function Dashboard() {
 
     setLoadingStats(true)
 
-    // Simular carregamento
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    try {
+      // Determinar quais tickets usar para as estatísticas
+      let userTickets = tickets
 
-    // Determinar quais tickets usar para as estatísticas
-    let userTickets = tickets
+      if (currentUser.role === "Supervisor" && selectedUserFilter) {
+        // Se for supervisor e tiver usuário selecionado, filtrar por esse usuário
+        userTickets = tickets.filter((ticket) => ticket.criado_por === selectedUserFilter)
+      } else if (currentUser.role === "Tecnico") {
+        // Se for técnico, mostrar apenas seus próprios tickets
+        userTickets = tickets.filter((ticket) => ticket.criado_por === currentUser.name)
+      }
+      // Se for supervisor sem filtro, mostra todos os tickets
 
-    if (currentUser.role === "Supervisor" && selectedUserFilter) {
-      // Se for supervisor e tiver usuário selecionado, filtrar por esse usuário
-      userTickets = tickets.filter((ticket) => ticket.criadoPor === selectedUserFilter)
-    } else if (currentUser.role === "Tecnico") {
-      // Se for técnico, mostrar apenas seus próprios tickets
-      userTickets = tickets.filter((ticket) => ticket.criadoPor === currentUser.name)
+      const stats: UserStats = {
+        totalTickets: userTickets.length,
+        resolvidos: userTickets.filter((t) => t.status === "Resolvido").length,
+        pendentes: userTickets.filter((t) => t.status === "Pendente").length,
+        emAndamento: userTickets.filter((t) => t.status === "Em Andamento").length,
+        emImplementacao: userTickets.filter((t) => t.em_implementacao).length,
+        ticketsRecentes: userTickets
+          .sort((a, b) => new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime())
+          .slice(0, 5),
+        atividadeMensal: calculateMonthlyActivity(userTickets),
+        porPlataforma: [
+          { plataforma: "INTERCOM", count: userTickets.filter((t) => t.plataforma === "INTERCOM").length },
+          { plataforma: "GRONERZAP", count: userTickets.filter((t) => t.plataforma === "GRONERZAP").length },
+        ],
+        porDepartamento: departamentos
+          .map((dep) => ({
+            departamento: dep,
+            count: userTickets.filter((t) => t.departamento === dep).length,
+          }))
+          .filter((item) => item.count > 0),
+      }
+
+      setUserStats(stats)
+    } catch (error) {
+      console.error("Erro ao carregar estatísticas:", error)
+    } finally {
+      setLoadingStats(false)
     }
-    // Se for supervisor sem filtro, mostra todos os tickets
-
-    const stats: UserStats = {
-      totalTickets: userTickets.length,
-      resolvidos: userTickets.filter((t) => t.status === "Resolvido").length,
-      pendentes: userTickets.filter((t) => t.status === "Pendente").length,
-      emAndamento: userTickets.filter((t) => t.status === "Em Andamento").length,
-      emImplementacao: userTickets.filter((t) => t.emImplementacao).length,
-      ticketsRecentes: userTickets
-        .sort((a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime())
-        .slice(0, 5),
-      atividadeMensal: calculateMonthlyActivity(userTickets),
-      porPlataforma: [
-        { plataforma: "INTERCOM", count: userTickets.filter((t) => t.plataforma === "INTERCOM").length },
-        { plataforma: "GRONERZAP", count: userTickets.filter((t) => t.plataforma === "GRONERZAP").length },
-      ],
-      porDepartamento: departamentos
-        .map((dep) => ({
-          departamento: dep,
-          count: userTickets.filter((t) => t.departamento === dep).length,
-        }))
-        .filter((item) => item.count > 0),
-    }
-
-    setUserStats(stats)
-    setLoadingStats(false)
   }
 
   // Função de login
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoginError("")
+    setLoading(true)
 
-    const user = mockUsers.find((u) => u.username === loginForm.username)
+    try {
+      const user = await userService.validateUser(loginForm.username, loginForm.password)
 
-    if (!user || loginForm.password !== "123456") {
-      setLoginError("Usuário ou senha incorretos")
-      return
-    }
+      if (!user) {
+        setLoginError("Usuário ou senha incorretos")
+        return
+      }
 
-    setCurrentUser(user)
-    setIsLoggedIn(true)
-    setActiveTab(user.role === "Supervisor" ? "tickets" : "novo")
+      setCurrentUser(user)
+      setIsLoggedIn(true)
+      setActiveTab(user.role === "Supervisor" ? "tickets" : "novo")
 
-    if (loginForm.remember) {
-      localStorage.setItem("currentUser", JSON.stringify(user))
+      if (loginForm.remember) {
+        localStorage.setItem("currentUser", JSON.stringify(user))
+      }
+    } catch (error) {
+      console.error("Erro no login:", error)
+      setLoginError("Erro ao fazer login")
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -503,37 +358,47 @@ export default function Dashboard() {
     setIsLoggedIn(false)
     setActiveTab("")
     setSelectedUserFilter("")
+    setTickets([])
+    setFilteredTickets([])
+    setUsers([])
     localStorage.removeItem("currentUser")
   }
 
   // Função para criar novo ticket
-  const handleCreateTicket = (e: React.FormEvent) => {
+  const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!currentUser) return
 
-    const ticket: Ticket = {
-      id: tickets.length + 1,
-      empresa: newTicket.empresa,
-      plataforma: newTicket.plataforma,
-      departamento: newTicket.departamento,
-      descricao: newTicket.descricao,
-      status: "Em Andamento",
-      emImplementacao: newTicket.emImplementacao,
-      criadoPor: currentUser.name,
-      criadoEm: new Date().toISOString(),
+    try {
+      setLoading(true)
+      await ticketService.createTicket({
+        empresa: newTicket.empresa,
+        plataforma: newTicket.plataforma,
+        departamento: newTicket.departamento,
+        descricao: newTicket.descricao,
+        em_implementacao: newTicket.emImplementacao,
+        criado_por: currentUser.name,
+      })
+
+      // Recarregar tickets
+      await loadTickets()
+
+      setNewTicket({
+        empresa: "",
+        plataforma: "INTERCOM",
+        departamento: "",
+        descricao: "",
+        emImplementacao: false,
+      })
+
+      alert("Ticket criado com sucesso!")
+    } catch (error) {
+      console.error("Erro ao criar ticket:", error)
+      alert("Erro ao criar ticket")
+    } finally {
+      setLoading(false)
     }
-
-    setTickets([ticket, ...tickets])
-    setNewTicket({
-      empresa: "",
-      plataforma: "INTERCOM",
-      departamento: "",
-      descricao: "",
-      emImplementacao: false,
-    })
-
-    alert("Ticket criado com sucesso!")
   }
 
   // Função para limpar filtros
@@ -551,18 +416,32 @@ export default function Dashboard() {
   }
 
   // Função para excluir ticket (apenas admin)
-  const handleDeleteTicket = (ticketId: number) => {
+  const handleDeleteTicket = async (ticketId: number) => {
     if (currentUser?.role === "Supervisor" && confirm("Tem certeza que deseja excluir este ticket?")) {
-      setTickets(tickets.filter((t) => t.id !== ticketId))
-      alert("Ticket excluído com sucesso!")
+      try {
+        await ticketService.deleteTicket(ticketId)
+        await loadTickets()
+        alert("Ticket excluído com sucesso!")
+      } catch (error) {
+        console.error("Erro ao excluir ticket:", error)
+        alert("Erro ao excluir ticket")
+      }
     }
   }
 
   // Função para editar status do ticket
-  const handleEditStatus = (ticketId: number, newStatus: "Em Andamento" | "Resolvido" | "Pendente") => {
-    setTickets(tickets.map((ticket) => (ticket.id === ticketId ? { ...ticket, status: newStatus } : ticket)))
-    setEditingTicket(null)
-    alert("Status atualizado com sucesso!")
+  const handleEditStatus = async (ticketId: number, newStatus: "Em Andamento" | "Resolvido" | "Pendente") => {
+    if (!currentUser) return
+
+    try {
+      await ticketService.updateTicketStatus(ticketId, newStatus, currentUser.name)
+      await loadTickets()
+      setEditingTicket(null)
+      alert("Status atualizado com sucesso!")
+    } catch (error) {
+      console.error("Erro ao atualizar status:", error)
+      alert("Erro ao atualizar status")
+    }
   }
 
   // Função para iniciar edição
@@ -602,14 +481,14 @@ export default function Dashboard() {
 
   // Cálculos das métricas gerais (baseado nos tickets visíveis para o usuário)
   const visibleTickets =
-    currentUser?.role === "Supervisor" ? tickets : tickets.filter((t) => t.criadoPor === currentUser?.name)
+    currentUser?.role === "Supervisor" ? tickets : tickets.filter((t) => t.criado_por === currentUser?.name)
   const totalAtendimentos = filteredTickets.length
   const resolvidos = filteredTickets.filter((t) => t.status === "Resolvido").length
   const naoResolvidos = filteredTickets.filter((t) => t.status !== "Resolvido").length
   const intercom = filteredTickets.filter((t) => t.plataforma === "INTERCOM").length
   const gronerzap = filteredTickets.filter((t) => t.plataforma === "GRONERZAP").length
   const conclusaoPercent = totalAtendimentos > 0 ? Math.round((resolvidos / totalAtendimentos) * 100) : 0
-  const emImplementacao = filteredTickets.filter((t) => t.emImplementacao).length
+  const emImplementacao = filteredTickets.filter((t) => t.em_implementacao).length
 
   if (!isLoggedIn) {
     return (
@@ -633,6 +512,7 @@ export default function Dashboard() {
                 className="form-input"
                 placeholder="Digite seu usuário"
                 required
+                disabled={loading}
               />
             </div>
 
@@ -645,6 +525,7 @@ export default function Dashboard() {
                 className="form-input"
                 placeholder="Digite sua senha"
                 required
+                disabled={loading}
               />
             </div>
 
@@ -655,6 +536,7 @@ export default function Dashboard() {
                 checked={loginForm.remember}
                 onChange={(e) => setLoginForm({ ...loginForm, remember: e.target.checked })}
                 className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
+                disabled={loading}
               />
               <label htmlFor="remember" className="ml-2 block text-sm text-gray-700">
                 Lembrar-me
@@ -665,8 +547,8 @@ export default function Dashboard() {
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">❌ {loginError}</div>
             )}
 
-            <button type="submit" className="btn-primary w-full">
-              🚀 Entrar
+            <button type="submit" className="btn-primary w-full" disabled={loading}>
+              {loading ? "🔄 Entrando..." : "🚀 Entrar"}
             </button>
           </form>
         </div>
@@ -851,7 +733,7 @@ export default function Dashboard() {
                 >
                   👥 Usuários
                   <span className="ml-2 bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full">
-                    {mockUsers.length}
+                    {users.length}
                   </span>
                 </button>
               )}
@@ -875,6 +757,7 @@ export default function Dashboard() {
                         className="form-input"
                         placeholder="Nome da empresa"
                         required
+                        disabled={loading}
                       />
                     </div>
 
@@ -886,6 +769,7 @@ export default function Dashboard() {
                           setNewTicket({ ...newTicket, plataforma: e.target.value as "INTERCOM" | "GRONERZAP" })
                         }
                         className="form-input"
+                        disabled={loading}
                       >
                         <option value="INTERCOM">💬 INTERCOM</option>
                         <option value="GRONERZAP">📱 GRONERZAP</option>
@@ -899,6 +783,7 @@ export default function Dashboard() {
                         onChange={(e) => setNewTicket({ ...newTicket, departamento: e.target.value })}
                         className="form-input"
                         required
+                        disabled={loading}
                       >
                         <option value="">Selecione um departamento</option>
                         {departamentos.map((dept) => (
@@ -916,6 +801,7 @@ export default function Dashboard() {
                         checked={newTicket.emImplementacao}
                         onChange={(e) => setNewTicket({ ...newTicket, emImplementacao: e.target.checked })}
                         className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
+                        disabled={loading}
                       />
                       <label htmlFor="emImplementacao" className="ml-2 block text-sm text-gray-700">
                         ⚙️ Marcar como em implementação
@@ -932,11 +818,12 @@ export default function Dashboard() {
                       className="form-input"
                       placeholder="Descreva detalhadamente o problema ou solicitação..."
                       required
+                      disabled={loading}
                     />
                   </div>
 
-                  <button type="submit" className="btn-primary">
-                    ✅ Criar Ticket
+                  <button type="submit" className="btn-primary" disabled={loading}>
+                    {loading ? "🔄 Criando..." : "✅ Criar Ticket"}
                   </button>
                 </form>
               </div>
@@ -1070,96 +957,103 @@ export default function Dashboard() {
 
                 {/* Lista de Tickets */}
                 <div className="space-y-4">
-                  {filteredTickets.map((ticket) => (
-                    <div key={ticket.id} className="ticket-card slide-up">
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-3 mb-2">
-                            <h3 className="text-lg font-semibold text-gray-800">🏢 {ticket.empresa}</h3>
-                            {ticket.emImplementacao && (
-                              <span className="status-badge bg-orange-100 text-orange-800">⚙️ Em Implementação</span>
-                            )}
-                          </div>
-                          <p className="text-gray-600 mb-3">{ticket.descricao}</p>
-                          <div className="flex flex-wrap gap-2 text-sm">
-                            <span className="status-badge bg-blue-100 text-blue-800">
-                              {ticket.plataforma === "INTERCOM" ? "💬" : "📱"} {ticket.plataforma}
-                            </span>
-                            <span className="status-badge bg-purple-100 text-purple-800">
-                              {getDepartmentEmoji(ticket.departamento)} {ticket.departamento}
-                            </span>
-                            {currentUser?.role === "Supervisor" && (
-                              <span className="status-badge bg-gray-100 text-gray-800">👤 {ticket.criadoPor}</span>
-                            )}
-                            <span className="status-badge bg-gray-100 text-gray-800">
-                              📅 {new Date(ticket.criadoEm).toLocaleDateString("pt-BR")}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="ml-4 flex flex-col items-end space-y-2">
-                          {editingTicket === ticket.id ? (
-                            <div className="flex items-center space-x-2">
-                              <select
-                                value={editStatus}
-                                onChange={(e) =>
-                                  setEditStatus(e.target.value as "Em Andamento" | "Resolvido" | "Pendente")
-                                }
-                                className="px-2 py-1 border border-gray-300 rounded text-sm"
-                              >
-                                <option value="Em Andamento">🔄 Em Andamento</option>
-                                <option value="Resolvido">✅ Resolvido</option>
-                                <option value="Pendente">⏳ Pendente</option>
-                              </select>
-                              <button
-                                onClick={() => handleEditStatus(ticket.id, editStatus)}
-                                className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs"
-                              >
-                                ✅
-                              </button>
-                              <button
-                                onClick={() => setEditingTicket(null)}
-                                className="bg-gray-500 hover:bg-gray-600 text-white px-2 py-1 rounded text-xs"
-                              >
-                                ❌
-                              </button>
+                  {loading ? (
+                    <div className="flex justify-center items-center py-12">
+                      <div className="loading-spinner"></div>
+                      <span className="ml-3 text-gray-600">Carregando tickets...</span>
+                    </div>
+                  ) : (
+                    filteredTickets.map((ticket) => (
+                      <div key={ticket.id} className="ticket-card slide-up">
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-3 mb-2">
+                              <h3 className="text-lg font-semibold text-gray-800">🏢 {ticket.empresa}</h3>
+                              {ticket.em_implementacao && (
+                                <span className="status-badge bg-orange-100 text-orange-800">⚙️ Em Implementação</span>
+                              )}
                             </div>
-                          ) : (
-                            <span className={cn("status-badge", getStatusColor(ticket.status))}>
-                              {ticket.status === "Resolvido" && "✅"}
-                              {ticket.status === "Em Andamento" && "🔄"}
-                              {ticket.status === "Pendente" && "⏳"} {ticket.status}
-                            </span>
-                          )}
-
-                          <div className="flex space-x-1">
-                            {/* Botão de editar status - apenas para o criador do ticket */}
-                            {currentUser?.name === ticket.criadoPor && editingTicket !== ticket.id && (
-                              <button
-                                onClick={() => startEditing(ticket.id, ticket.status)}
-                                className="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs"
-                                title="Editar status"
-                              >
-                                ✏️
-                              </button>
+                            <p className="text-gray-600 mb-3">{ticket.descricao}</p>
+                            <div className="flex flex-wrap gap-2 text-sm">
+                              <span className="status-badge bg-blue-100 text-blue-800">
+                                {ticket.plataforma === "INTERCOM" ? "💬" : "📱"} {ticket.plataforma}
+                              </span>
+                              <span className="status-badge bg-purple-100 text-purple-800">
+                                {getDepartmentEmoji(ticket.departamento)} {ticket.departamento}
+                              </span>
+                              {currentUser?.role === "Supervisor" && (
+                                <span className="status-badge bg-gray-100 text-gray-800">👤 {ticket.criado_por}</span>
+                              )}
+                              <span className="status-badge bg-gray-100 text-gray-800">
+                                📅 {new Date(ticket.criado_em).toLocaleDateString("pt-BR")}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="ml-4 flex flex-col items-end space-y-2">
+                            {editingTicket === ticket.id ? (
+                              <div className="flex items-center space-x-2">
+                                <select
+                                  value={editStatus}
+                                  onChange={(e) =>
+                                    setEditStatus(e.target.value as "Em Andamento" | "Resolvido" | "Pendente")
+                                  }
+                                  className="px-2 py-1 border border-gray-300 rounded text-sm"
+                                >
+                                  <option value="Em Andamento">🔄 Em Andamento</option>
+                                  <option value="Resolvido">✅ Resolvido</option>
+                                  <option value="Pendente">⏳ Pendente</option>
+                                </select>
+                                <button
+                                  onClick={() => handleEditStatus(ticket.id, editStatus)}
+                                  className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs"
+                                >
+                                  ✅
+                                </button>
+                                <button
+                                  onClick={() => setEditingTicket(null)}
+                                  className="bg-gray-500 hover:bg-gray-600 text-white px-2 py-1 rounded text-xs"
+                                >
+                                  ❌
+                                </button>
+                              </div>
+                            ) : (
+                              <span className={cn("status-badge", getStatusColor(ticket.status))}>
+                                {ticket.status === "Resolvido" && "✅"}
+                                {ticket.status === "Em Andamento" && "🔄"}
+                                {ticket.status === "Pendente" && "⏳"} {ticket.status}
+                              </span>
                             )}
 
-                            {/* Botão de excluir - apenas para admin */}
-                            {currentUser?.role === "Supervisor" && (
-                              <button
-                                onClick={() => handleDeleteTicket(ticket.id)}
-                                className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs"
-                                title="Excluir ticket"
-                              >
-                                🗑️
-                              </button>
-                            )}
+                            <div className="flex space-x-1">
+                              {/* Botão de editar status - apenas para o criador do ticket */}
+                              {currentUser?.name === ticket.criado_por && editingTicket !== ticket.id && (
+                                <button
+                                  onClick={() => startEditing(ticket.id, ticket.status)}
+                                  className="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs"
+                                  title="Editar status"
+                                >
+                                  ✏️
+                                </button>
+                              )}
+
+                              {/* Botão de excluir - apenas para admin */}
+                              {currentUser?.role === "Supervisor" && (
+                                <button
+                                  onClick={() => handleDeleteTicket(ticket.id)}
+                                  className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs"
+                                  title="Excluir ticket"
+                                >
+                                  🗑️
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
 
-                  {filteredTickets.length === 0 && (
+                  {!loading && filteredTickets.length === 0 && (
                     <div className="text-center py-12">
                       <div className="text-6xl mb-4">🔍</div>
                       <h3 className="text-lg font-medium text-gray-800 mb-2">
@@ -1195,7 +1089,7 @@ export default function Dashboard() {
                           className="form-input"
                         >
                           <option value="">Todos os tickets</option>
-                          {mockUsers
+                          {users
                             .filter((u) => u.role === "Tecnico")
                             .map((user) => (
                               <option key={user.id} value={user.name}>
@@ -1368,7 +1262,7 @@ export default function Dashboard() {
                               <div className="flex-1">
                                 <div className="flex items-center space-x-2 mb-1">
                                   <span className="font-medium text-gray-800">🏢 {ticket.empresa}</span>
-                                  {ticket.emImplementacao && <span className="text-orange-500">⚙️</span>}
+                                  {ticket.em_implementacao && <span className="text-orange-500">⚙️</span>}
                                 </div>
                                 <p className="text-sm text-gray-600 truncate">{ticket.descricao}</p>
                               </div>
@@ -1379,7 +1273,7 @@ export default function Dashboard() {
                                   {ticket.status === "Pendente" && "⏳"} {ticket.status}
                                 </span>
                                 <p className="text-xs text-gray-500 mt-1">
-                                  {new Date(ticket.criadoEm).toLocaleDateString("pt-BR")}
+                                  {new Date(ticket.criado_em).toLocaleDateString("pt-BR")}
                                 </p>
                               </div>
                             </div>
@@ -1411,7 +1305,7 @@ export default function Dashboard() {
                     <h3 className="text-lg font-semibold text-gray-800">Lista de Usuários</h3>
                   </div>
                   <div className="divide-y divide-gray-200">
-                    {mockUsers.map((user) => (
+                    {users.map((user) => (
                       <div key={user.id} className="px-6 py-4 flex items-center justify-between">
                         <div className="flex items-center space-x-4">
                           <div className="w-10 h-10 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
@@ -1437,7 +1331,7 @@ export default function Dashboard() {
                             <p className="text-xs text-gray-500 mt-1">{user.department}</p>
                           </div>
                           <div className="text-sm text-gray-500">
-                            {tickets.filter((t) => t.criadoPor === user.name).length} tickets
+                            {tickets.filter((t) => t.criado_por === user.name).length} tickets
                           </div>
                         </div>
                       </div>
@@ -1477,6 +1371,7 @@ export default function Dashboard() {
                       className="form-input"
                       placeholder="Ex: João Silva"
                       required
+                      disabled={loading}
                     />
                   </div>
 
@@ -1489,6 +1384,7 @@ export default function Dashboard() {
                       className="form-input"
                       placeholder="Ex: joao.silva"
                       required
+                      disabled={loading}
                     />
                   </div>
 
@@ -1498,6 +1394,7 @@ export default function Dashboard() {
                       value={newUser.role}
                       onChange={(e) => setNewUser({ ...newUser, role: e.target.value as "Supervisor" | "Tecnico" })}
                       className="form-input"
+                      disabled={loading}
                     >
                       <option value="Tecnico">🛠️ Técnico</option>
                       <option value="Supervisor">👑 Supervisor</option>
@@ -1511,6 +1408,7 @@ export default function Dashboard() {
                       onChange={(e) => setNewUser({ ...newUser, department: e.target.value })}
                       className="form-input"
                       required
+                      disabled={loading}
                     >
                       <option value="">Selecione um departamento</option>
                       {departamentos.map((dept) => (
@@ -1531,6 +1429,7 @@ export default function Dashboard() {
                       className="form-input"
                       placeholder="Mínimo 6 caracteres"
                       required
+                      disabled={loading}
                     />
                   </div>
 
@@ -1543,6 +1442,7 @@ export default function Dashboard() {
                       className="form-input"
                       placeholder="Digite a senha novamente"
                       required
+                      disabled={loading}
                     />
                   </div>
 
@@ -1553,10 +1453,15 @@ export default function Dashboard() {
                   )}
 
                   <div className="flex space-x-3 pt-4">
-                    <button type="submit" className="btn-primary flex-1">
-                      ✅ Adicionar Usuário
+                    <button type="submit" className="btn-primary flex-1" disabled={loading}>
+                      {loading ? "🔄 Adicionando..." : "✅ Adicionar Usuário"}
                     </button>
-                    <button type="button" onClick={closeAddUserModal} className="btn-secondary flex-1">
+                    <button
+                      type="button"
+                      onClick={closeAddUserModal}
+                      className="btn-secondary flex-1"
+                      disabled={loading}
+                    >
                       ❌ Cancelar
                     </button>
                   </div>
@@ -1598,6 +1503,11 @@ export default function Dashboard() {
           box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
         }
 
+        .form-input:disabled {
+          background-color: #f9fafb;
+          cursor: not-allowed;
+        }
+
         .btn-primary {
           background: linear-gradient(135deg, #10b981, #059669);
           color: white;
@@ -1612,10 +1522,16 @@ export default function Dashboard() {
           gap: 8px;
         }
 
-        .btn-primary:hover {
+        .btn-primary:hover:not(:disabled) {
           background: linear-gradient(135deg, #059669, #047857);
           transform: translateY(-1px);
           box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-primary:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+          transform: none;
         }
 
         .btn-secondary {
@@ -1629,9 +1545,14 @@ export default function Dashboard() {
           transition: all 0.2s;
         }
 
-        .btn-secondary:hover {
+        .btn-secondary:hover:not(:disabled) {
           background: #e5e7eb;
           border-color: #9ca3af;
+        }
+
+        .btn-secondary:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
         }
 
         .stats-grid {
@@ -1805,11 +1726,6 @@ export default function Dashboard() {
           to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Modal Styles */
-        .modal-overlay {
-          backdrop-filter: blur(4px);
-        }
-
         .form-input {
           width: 100%;
           padding: 12px 16px;
@@ -1831,7 +1747,6 @@ export default function Dashboard() {
           color: #9ca3af;
         }
 
-        /* Garantir que o texto seja escuro em todos os elementos */
         * {
           color: inherit;
         }
@@ -1856,7 +1771,6 @@ export default function Dashboard() {
           color: #6b7280 !important;
         }
 
-        /* Containers com texto escuro */
         .metric-card,
         .ticket-card,
         .chart-container,
@@ -1871,6 +1785,21 @@ export default function Dashboard() {
         .filter-section *,
         .department-card * {
           color: inherit;
+        }
+
+        @media (max-width: 768px) {
+          .stats-grid {
+            grid-template-columns: 1fr;
+          }
+          
+          .department-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+          
+          .tab-button {
+            font-size: 14px;
+            padding: 12px 0;
+          }
         }
       `}</style>
     </div>
