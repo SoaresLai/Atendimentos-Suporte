@@ -31,6 +31,15 @@ namespace SupportDashboard.Models
         
         [Display(Name = "Data de Criação")]
         public DateTime DataCriacao { get; set; } = DateTime.Now;
+        
+        [Display(Name = "Criado por")]
+        public string CreatedBy { get; set; } = string.Empty;
+
+        [Display(Name = "Atualizado por")]
+        public string? UpdatedBy { get; set; }
+
+        [Display(Name = "Data de Atualização")]
+        public DateTime? UpdatedAt { get; set; }
     }
     
     public enum Plataforma

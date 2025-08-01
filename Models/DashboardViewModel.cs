@@ -5,6 +5,7 @@ namespace SupportDashboard.Models
         public List<Ticket> Tickets { get; set; } = new List<Ticket>();
         public DashboardMetrics Metrics { get; set; } = new DashboardMetrics();
         public Ticket NovoTicket { get; set; } = new Ticket();
+        public User? CurrentUser { get; set; }
     }
     
     public class DashboardMetrics
