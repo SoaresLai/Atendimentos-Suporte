@@ -298,6 +298,18 @@ export default function Dashboard() {
   const [editStatus, setEditStatus] = useState<"Em Andamento" | "Resolvido" | "Pendente">("Em Andamento")
   const [selectedUserFilter, setSelectedUserFilter] = useState("")
 
+  // Estados para adicionar usuário
+  const [showAddUserModal, setShowAddUserModal] = useState(false)
+  const [newUser, setNewUser] = useState({
+    username: "",
+    name: "",
+    role: "Tecnico" as "Supervisor" | "Tecnico",
+    department: "",
+    password: "",
+    confirmPassword: "",
+  })
+  const [addUserError, setAddUserError] = useState("")
+
   // Verificar login salvo
   useEffect(() => {
     const savedUser = localStorage.getItem("currentUser")
@@ -308,6 +320,66 @@ export default function Dashboard() {
       setActiveTab(user.role === "Supervisor" ? "tickets" : "novo")
     }
   }, [])
+
+  // Função para adicionar novo usuário
+  const handleAddUser = (e: React.FormEvent) => {
+    e.preventDefault()
+    setAddUserError("")
+
+    // Validações
+    if (newUser.password !== newUser.confirmPassword) {
+      setAddUserError("As senhas não coincidem")
+      return
+    }
+
+    if (newUser.password.length < 6) {
+      setAddUserError("A senha deve ter pelo menos 6 caracteres")
+      return
+    }
+
+    if (mockUsers.find((u) => u.username === newUser.username)) {
+      setAddUserError("Nome de usuário já existe")
+      return
+    }
+
+    // Criar novo usuário
+    const user: User = {
+      id: mockUsers.length + 1,
+      username: newUser.username,
+      name: newUser.name,
+      role: newUser.role,
+      department: newUser.department,
+    }
+
+    // Adicionar à lista (em uma aplicação real, isso seria uma chamada à API)
+    mockUsers.push(user)
+
+    // Limpar formulário e fechar modal
+    setNewUser({
+      username: "",
+      name: "",
+      role: "Tecnico",
+      department: "",
+      password: "",
+      confirmPassword: "",
+    })
+    setShowAddUserModal(false)
+    alert("Usuário adicionado com sucesso!")
+  }
+
+  // Função para fechar modal
+  const closeAddUserModal = () => {
+    setShowAddUserModal(false)
+    setAddUserError("")
+    setNewUser({
+      username: "",
+      name: "",
+      role: "Tecnico",
+      department: "",
+      password: "",
+      confirmPassword: "",
+    })
+  }
 
   // Aplicar filtros baseados no usuário e filtros selecionados
   useEffect(() => {
@@ -1394,12 +1466,125 @@ export default function Dashboard() {
                 </div>
 
                 <div className="mt-6">
-                  <button className="btn-primary">➕ Adicionar Usuário</button>
+                  <button onClick={() => setShowAddUserModal(true)} className="btn-primary">
+                    ➕ Adicionar Usuário
+                  </button>
                 </div>
               </div>
             )}
           </div>
         </div>
+
+        {/* Modal Adicionar Usuário */}
+        {showAddUserModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-xl font-bold text-gray-800">➕ Adicionar Novo Usuário</h3>
+                  <button onClick={closeAddUserModal} className="text-gray-400 hover:text-gray-600 text-2xl">
+                    ✕
+                  </button>
+                </div>
+
+                <form onSubmit={handleAddUser} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">👤 Nome Completo</label>
+                    <input
+                      type="text"
+                      value={newUser.name}
+                      onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+                      className="form-input"
+                      placeholder="Ex: João Silva"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">🔑 Nome de Usuário</label>
+                    <input
+                      type="text"
+                      value={newUser.username}
+                      onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
+                      className="form-input"
+                      placeholder="Ex: joao.silva"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">👑 Função</label>
+                    <select
+                      value={newUser.role}
+                      onChange={(e) => setNewUser({ ...newUser, role: e.target.value as "Supervisor" | "Tecnico" })}
+                      className="form-input"
+                    >
+                      <option value="Tecnico">🛠️ Técnico</option>
+                      <option value="Supervisor">👑 Supervisor</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">🏢 Departamento</label>
+                    <select
+                      value={newUser.department}
+                      onChange={(e) => setNewUser({ ...newUser, department: e.target.value })}
+                      className="form-input"
+                      required
+                    >
+                      <option value="">Selecione um departamento</option>
+                      {departamentos.map((dept) => (
+                        <option key={dept} value={dept}>
+                          {getDepartmentEmoji(dept)} {dept}
+                        </option>
+                      ))}
+                      <option value="Geral">🏢 Geral</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">🔒 Senha</label>
+                    <input
+                      type="password"
+                      value={newUser.password}
+                      onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                      className="form-input"
+                      placeholder="Mínimo 6 caracteres"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">🔒 Confirmar Senha</label>
+                    <input
+                      type="password"
+                      value={newUser.confirmPassword}
+                      onChange={(e) => setNewUser({ ...newUser, confirmPassword: e.target.value })}
+                      className="form-input"
+                      placeholder="Digite a senha novamente"
+                      required
+                    />
+                  </div>
+
+                  {addUserError && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                      ❌ {addUserError}
+                    </div>
+                  )}
+
+                  <div className="flex space-x-3 pt-4">
+                    <button type="submit" className="btn-primary flex-1">
+                      ✅ Adicionar Usuário
+                    </button>
+                    <button type="button" onClick={closeAddUserModal} className="btn-secondary flex-1">
+                      ❌ Cancelar
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <style jsx>{`
@@ -1640,19 +1825,72 @@ export default function Dashboard() {
           to { opacity: 1; transform: translateY(0); }
         }
 
-        @media (max-width: 768px) {
-          .stats-grid {
-            grid-template-columns: 1fr;
-          }
-          
-          .department-grid {
-            grid-template-columns: repeat(2, 1fr);
-          }
-          
-          .tab-button {
-            font-size: 14px;
-            padding: 12px 0;
-          }
+        /* Modal Styles */
+        .modal-overlay {
+          backdrop-filter: blur(4px);
+        }
+
+        .form-input {
+          width: 100%;
+          padding: 12px 16px;
+          border: 1px solid #d1d5db;
+          border-radius: 8px;
+          font-size: 14px;
+          transition: all 0.2s;
+          background: white;
+          color: #1f2937 !important;
+        }
+
+        .form-input:focus {
+          outline: none;
+          border-color: #10b981;
+          box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+        }
+
+        .form-input::placeholder {
+          color: #9ca3af;
+        }
+
+        /* Garantir que o texto seja escuro em todos os elementos */
+        * {
+          color: inherit;
+        }
+
+        body {
+          color: #1f2937;
+        }
+
+        .text-gray-800 {
+          color: #1f2937 !important;
+        }
+
+        .text-gray-700 {
+          color: #374151 !important;
+        }
+
+        .text-gray-600 {
+          color: #4b5563 !important;
+        }
+
+        .text-gray-500 {
+          color: #6b7280 !important;
+        }
+
+        /* Containers com texto escuro */
+        .metric-card,
+        .ticket-card,
+        .chart-container,
+        .filter-section,
+        .department-card {
+          color: #1f2937;
+        }
+
+        .metric-card *,
+        .ticket-card *,
+        .chart-container *,
+        .filter-section *,
+        .department-card * {
+          color: inherit;
         }
       `}</style>
     </div>
