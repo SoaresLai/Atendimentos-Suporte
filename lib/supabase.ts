@@ -94,6 +94,69 @@ export const userService = {
 
     return !error && data
   },
+
+  async updateProfile(userId: number, updates: {
+    name?: string
+    email?: string
+    avatar?: string
+  }) {
+    const { data, error } = await supabase
+      .from("users")
+      .update(updates)
+      .eq("id", userId)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  },
+
+  async changePassword(userId: number, currentPassword: string, newPassword: string) {
+    // Primeiro, verificar a senha atual
+    const { data: user, error: fetchError } = await supabase
+      .from("users")
+      .select("password_hash")
+      .eq("id", userId)
+      .single()
+
+    if (fetchError) throw fetchError
+
+    // Verificar senha atual
+    const currentPasswordHash = btoa(currentPassword + "SaltKey2024")
+    if (user.password_hash !== currentPasswordHash) {
+      throw new Error("Senha atual incorreta")
+    }
+
+    // Atualizar para nova senha
+    const newPasswordHash = btoa(newPassword + "SaltKey2024")
+    const { error: updateError } = await supabase
+      .from("users")
+      .update({ password_hash: newPasswordHash })
+      .eq("id", userId)
+
+    if (updateError) throw updateError
+  },
+
+  async uploadAvatar(userId: number, file: File) {
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${userId}-${Date.now()}.${fileExt}`
+    
+    const { data, error } = await supabase.storage
+      .from('avatars')
+      .upload(fileName, file)
+
+    if (error) throw error
+
+    // Obter URL pública
+    const { data: { publicUrl } } = supabase.storage
+      .from('avatars')
+      .getPublicUrl(fileName)
+
+    // Atualizar perfil do usuário
+    await this.updateProfile(userId, { avatar: publicUrl })
+    
+    return publicUrl
+  },
 }
 
 // Funções para tickets
