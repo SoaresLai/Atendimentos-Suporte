@@ -690,7 +690,7 @@ export default function Dashboard() {
 
           <div className="flex space-x-3 pt-4">
             <button type="submit" className="btn-primary flex-1" disabled={loading}>
-              {loading ? "�� Salvando..." : "💾 Salvar Perfil"}
+              {loading ? "🔄 Salvando..." : "💾 Salvar Perfil"}
             </button>
             <button
               type="button"
@@ -711,7 +711,7 @@ export default function Dashboard() {
           <h3 className="text-lg font-semibold text-gray-800 mb-4">🔒 Alterar Senha</h3>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">�� Senha Atual</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">🔑 Senha Atual</label>
             <input
               type="password"
               value={profileForm.currentPassword}
@@ -736,7 +736,7 @@ export default function Dashboard() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">�� Confirmar Nova Senha</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">🔑 Confirmar Nova Senha</label>
             <input
               type="password"
               value={profileForm.confirmPassword}
@@ -772,6 +772,7 @@ export default function Dashboard() {
         descricao: newTicket.descricao,
         em_implementacao: newTicket.emImplementacao,
         criado_por: currentUser.name,
+        status: newTicket.status,
       })
 
       // Recarregar tickets
@@ -2493,7 +2494,7 @@ export default function Dashboard() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">🔐 Nova Senha</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">🔑 Nova Senha</label>
                     <input
                       type="password"
                       value={profileForm.newPassword}
@@ -2506,7 +2507,7 @@ export default function Dashboard() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">🔐 Confirmar Nova Senha</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">🔑 Confirmar Nova Senha</label>
                     <input
                       type="password"
                       value={profileForm.confirmPassword}

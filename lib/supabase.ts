@@ -186,13 +186,13 @@ export const ticketService = {
     descricao: string
     em_implementacao: boolean
     criado_por: string
+    status: "Em Andamento" | "Resolvido" | "Pendente"
   }) {
     const { data, error } = await supabase
       .from("tickets")
       .insert([
         {
           ...ticketData,
-          status: "Em Andamento" as const,
           criado_em: new Date().toISOString(),
         },
       ])
