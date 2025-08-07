@@ -215,6 +215,14 @@ export default function Dashboard() {
   const [avatarPreview, setAvatarPreview] = useState<string>("")
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
 
+  // Estados para esconder/mostrar abas
+  const [hiddenTabs, setHiddenTabs] = useState<string[]>([])
+  const [showHeaderInfo, setShowHeaderInfo] = useState(false)
+
+  // Estados para atualização automática
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true)
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
+
   // Funções do perfil
   const openProfileModal = () => {
     if (currentUser) {
@@ -597,6 +605,56 @@ export default function Dashboard() {
     // limpa forms login
     setLoginForm({ username: "", password: "", remember:false})
   }
+
+  // Funções para gerenciar abas
+  const toggleTabVisibility = (tabName: string) => {
+    setHiddenTabs(prev => 
+      prev.includes(tabName) 
+        ? prev.filter(tab => tab !== tabName)
+        : [...prev, tabName]
+    )
+  }
+
+  const isTabVisible = (tabName: string) => {
+    return !hiddenTabs.includes(tabName)
+  }
+
+  // Função para atualização automática
+  const refreshData = async () => {
+    if (isLoggedIn) {
+      await loadTickets()
+      if (activeTab === "dashboard") {
+        await loadUserStats()
+      }
+      setLastRefresh(new Date())
+    }
+  }
+
+  // Configurar atualização automática a cada 30 segundos
+  useEffect(() => {
+    if (!isLoggedIn || !autoRefreshEnabled) return
+
+    const interval = setInterval(() => {
+      refreshData()
+    }, 30000) // 30 segundos
+
+    return () => clearInterval(interval)
+  }, [isLoggedIn, autoRefreshEnabled, activeTab])
+
+  // Redirecionar para uma aba visível se a atual for ocultada
+  useEffect(() => {
+    if (!isLoggedIn) return
+
+    const availableTabs = []
+    if (currentUser?.role === "Tecnico" && isTabVisible("novo")) availableTabs.push("novo")
+    if (isTabVisible("tickets")) availableTabs.push("tickets")
+    if (isTabVisible("dashboard")) availableTabs.push("dashboard")
+    if (currentUser?.role === "Supervisor") availableTabs.push("usuarios")
+
+    if (availableTabs.length > 0 && !availableTabs.includes(activeTab)) {
+      setActiveTab(availableTabs[0])
+    }
+  }, [hiddenTabs, activeTab, isLoggedIn, currentUser])
 
   {/* Botão de Perfil */}
 <button
@@ -990,38 +1048,120 @@ export default function Dashboard() {
             </div>
 
             <div className="flex items-center space-x-4">
-              <div className="text-right">
-                <p className="text-sm font-medium text-gray-800">
-                  {currentUser?.role === "Supervisor" ? "👑" : "🛠️"} {currentUser?.name}
-                </p>
-                <p className="text-xs text-gray-600">
-                  {currentUser?.role} - {currentUser?.department}
-                </p>
+              {/* Controles de visibilidade das abas */}
+              <div className="flex items-center space-x-2">
+                <div className="relative group">
+                  <button
+                    onClick={() => toggleTabVisibility("novo")}
+                    className={`px-2 py-1 text-xs rounded transition-colors ${isTabVisible("novo") ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}
+                  >
+                    ➕
+                  </button>
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                    {isTabVisible("novo") ? "Ocultar Novo Ticket" : "Mostrar Novo Ticket"}
+                  </div>
+                </div>
+                <div className="relative group">
+                  <button
+                    onClick={() => toggleTabVisibility("tickets")}
+                    className={`px-2 py-1 text-xs rounded transition-colors ${isTabVisible("tickets") ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}
+                  >
+                    📋
+                  </button>
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                    {isTabVisible("tickets") ? "Ocultar Meus Tickets" : "Mostrar Meus Tickets"}
+                  </div>
+                </div>
+                <div className="relative group">
+                  <button
+                    onClick={() => toggleTabVisibility("dashboard")}
+                    className={`px-2 py-1 text-xs rounded transition-colors ${isTabVisible("dashboard") ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}
+                  >
+                    📊
+                  </button>
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                    {isTabVisible("dashboard") ? "Ocultar Meu Dashboard" : "Mostrar Meu Dashboard"}
+                  </div>
+                </div>
               </div>
-              
-              {/* Botão de Perfil */}
-              <button
-                onClick={openProfileModal}
-                className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all duration-200 shadow-lg hover:shadow-xl"
+
+              {/* Controle de atualização automática */}
+              <div className="flex items-center space-x-2">
+                <div className="relative group">
+                  <button
+                    onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
+                    className={`px-2 py-1 text-xs rounded transition-colors ${autoRefreshEnabled ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-600"}`}
+                  >
+                    🔄
+                  </button>
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                    {autoRefreshEnabled ? "Desativar Auto" : "Ativar Auto"}
+                  </div>
+                </div>
+                <span className="text-xs text-gray-500">
+                  {lastRefresh.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+
+              {/* Área do usuário com hover */}
+              <div 
+                className="relative"
+                onMouseEnter={() => setShowHeaderInfo(true)}
+                onMouseLeave={() => setShowHeaderInfo(false)}
               >
-                {currentUser?.avatar ? (
-                  <img
-                    src={currentUser.avatar}
-                    alt={currentUser.name}
-                    className="w-6 h-6 rounded-full object-cover"
-                  />
-                ) : (
-                  <span className="text-lg">👤</span>
+                <div className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg cursor-pointer transition-all duration-200">
+                  {currentUser?.avatar ? (
+                    <img
+                      src={currentUser.avatar}
+                      alt={currentUser.name}
+                      className="w-6 h-6 rounded-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-lg">👤</span>
+                  )}
+                  <span className="hidden sm:inline">{currentUser?.name}</span>
+                </div>
+
+                {/* Dropdown com informações do usuário */}
+                {showHeaderInfo && (
+                  <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
+                    <div className="p-4">
+                      <div className="flex items-center space-x-3 mb-4">
+                        {currentUser?.avatar ? (
+                          <img
+                            src={currentUser.avatar}
+                            alt={currentUser.name}
+                            className="w-12 h-12 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
+                            <span className="text-white text-lg">👤</span>
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-medium text-gray-800">{currentUser?.name}</p>
+                          <p className="text-sm text-gray-600">{currentUser?.role} - {currentUser?.department}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <button
+                          onClick={openProfileModal}
+                          className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                        >
+                          👤 Meu Perfil
+                        </button>
+                        <button
+                          onClick={handleLogout}
+                          className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          🚪 Sair
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 )}
-                <span className="hidden sm:inline">Meu Perfil</span>
-              </button>
-              
-              <button
-                onClick={handleLogout}
-                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
-              >
-                🚪 Sair
-              </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1032,7 +1172,7 @@ export default function Dashboard() {
         <div className="glass-effect rounded-xl shadow-lg border border-white/20 mb-8">
           <div className="border-b border-gray-200">
             <nav className="flex space-x-8 px-6">
-              {currentUser?.role === "Tecnico" && (
+              {currentUser?.role === "Tecnico" && isTabVisible("novo") && (
                 <button
                   onClick={() => setActiveTab("novo")}
                   className={cn("tab-button", activeTab === "novo" ? "active" : "")}
@@ -1041,25 +1181,29 @@ export default function Dashboard() {
                 </button>
               )}
 
-              <button
-                onClick={() => setActiveTab("tickets")}
-                className={cn("tab-button", activeTab === "tickets" ? "active" : "")}
-              >
-                📋 {currentUser?.role === "Supervisor" ? "Todos os Tickets" : "Meus Tickets"}
-                <span className="ml-2 bg-emerald-100 text-emerald-800 text-xs px-2 py-1 rounded-full">
-                  {filteredTickets.length}
-                </span>
-              </button>
+              {isTabVisible("tickets") && (
+                <button
+                  onClick={() => setActiveTab("tickets")}
+                  className={cn("tab-button", activeTab === "tickets" ? "active" : "")}
+                >
+                  📋 {currentUser?.role === "Supervisor" ? "Todos os Tickets" : "Meus Tickets"}
+                  <span className="ml-2 bg-emerald-100 text-emerald-800 text-xs px-2 py-1 rounded-full">
+                    {filteredTickets.length}
+                  </span>
+                </button>
+              )}
 
-              <button
-                onClick={() => {
-                  setActiveTab("dashboard")
-                  loadUserStats()
-                }}
-                className={cn("tab-button", activeTab === "dashboard" ? "active" : "")}
-              >
-                📊 Meu Dashboard
-              </button>
+              {isTabVisible("dashboard") && (
+                <button
+                  onClick={() => {
+                    setActiveTab("dashboard")
+                    loadUserStats()
+                  }}
+                  className={cn("tab-button", activeTab === "dashboard" ? "active" : "")}
+                >
+                  📊 Meu Dashboard
+                </button>
+              )}
 
               {currentUser?.role === "Supervisor" && (
                 <button
@@ -1072,6 +1216,25 @@ export default function Dashboard() {
                   </span>
                 </button>
               )}
+
+              {/* Indicador quando todas as abas estão ocultas */}
+              {(() => {
+                const visibleTabs = []
+                if (currentUser?.role === "Tecnico" && isTabVisible("novo")) visibleTabs.push("novo")
+                if (isTabVisible("tickets")) visibleTabs.push("tickets")
+                if (isTabVisible("dashboard")) visibleTabs.push("dashboard")
+                if (currentUser?.role === "Supervisor") visibleTabs.push("usuarios")
+                
+                if (visibleTabs.length === 0) {
+                  return (
+                    <div className="flex items-center space-x-2 text-gray-500">
+                      <span>👁️</span>
+                      <span className="text-sm">Todas as abas estão ocultas</span>
+                    </div>
+                  )
+                }
+                return null
+              })()}
             </nav>
           </div>
 
@@ -1449,9 +1612,20 @@ export default function Dashboard() {
                         </select>
                       </div>
                     )}
-                    <button onClick={loadUserStats} className="btn-primary">
-                      🔄 Atualizar
-                    </button>
+                    <div className="flex items-center space-x-2">
+                      <button onClick={loadUserStats} className="btn-primary">
+                        🔄 Atualizar
+                      </button>
+                      <div className="flex items-center space-x-1 text-xs text-gray-500">
+                        {autoRefreshEnabled && (
+                          <span className="flex items-center space-x-1">
+                            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                            <span>Auto</span>
+                          </span>
+                        )}
+                        <span>Última: {lastRefresh.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -1703,13 +1877,33 @@ export default function Dashboard() {
         <div className="mb-4">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-gray-800">📊 Métricas do Dia</h2>
-            <div className="text-sm text-gray-600 bg-emerald-100 px-3 py-1 rounded-full">
-              📅 {new Date().toLocaleDateString('pt-BR', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-              })}
+            <div className="flex items-center space-x-4">
+              <div className="text-sm text-gray-600 bg-emerald-100 px-3 py-1 rounded-full">
+                📅 {new Date().toLocaleDateString('pt-BR', { 
+                  weekday: 'long', 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric' 
+                })}
+              </div>
+              <div className="flex items-center space-x-2">
+                <button 
+                  onClick={refreshData}
+                  className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded hover:bg-blue-200 transition-colors"
+                  title="Atualizar dados"
+                >
+                  🔄
+                </button>
+                <div className="flex items-center space-x-1 text-xs text-gray-500">
+                  {autoRefreshEnabled && (
+                    <span className="flex items-center space-x-1">
+                      <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                      <span>Auto</span>
+                    </span>
+                  )}
+                  <span>Última: {lastRefresh.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
