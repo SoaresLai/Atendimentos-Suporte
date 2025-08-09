@@ -4,6 +4,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { userService, ticketService, supabase } from "@/lib/supabase"
 import { AuthInvalidTokenResponseError } from "@supabase/supabase-js"
+import { toast } from "@/hooks/use-toast"
 
 interface User {
   id: number
@@ -461,13 +462,13 @@ export default function Dashboard() {
         confirmPassword: "",
       })
       setShowAddUserModal(false)
-      alert("Usuário adicionado com sucesso!")
+      toast({ description: "Usuário adicionado com sucesso!"})
     } catch (error) {
       console.error("Erro ao adicionar usuário:", error)
       setAddUserError("Erro ao adicionar usuário")
     }
   }
-
+      
   // Função para fechar modal
   const closeAddUserModal = () => {
     setShowAddUserModal(false)
@@ -845,14 +846,15 @@ export default function Dashboard() {
         status: "Em Andamento",
       })
 
-      alert("Ticket criado com sucesso!")
+      toast({ description: "Ticket criado com sucesso!" })
     } catch (error) {
-      console.error("Erro ao criar ticket:", error)
+      console.error("Erro ao criar ticket", error)
       alert("Erro ao criar ticket")
     } finally {
       setLoading(false)
     }
   }
+
 
   // Função para limpar filtros
   const clearFilters = () => {
@@ -874,14 +876,13 @@ export default function Dashboard() {
       try {
         await ticketService.deleteTicket(ticketId)
         await loadTickets()
-        alert("Ticket excluído com sucesso!")
+        toast({ description: "Ticket excluído com sucesso!"})
       } catch (error) {
         console.error("Erro ao excluir ticket:", error)
         alert("Erro ao excluir ticket")
       }
-    }
   }
-
+}
   // Função para editar status do ticket
   const handleEditStatus = async (ticketId: number, newStatus: "Em Andamento" | "Resolvido" | "Pendente") => {
     if (!currentUser) return
@@ -890,7 +891,7 @@ export default function Dashboard() {
       await ticketService.updateTicketStatus(ticketId, newStatus, currentUser.name)
       await loadTickets()
       setEditingTicket(null)
-      alert("Status atualizado com sucesso!")
+      toast({ description: "Status atualizado com sucesso!" })
     } catch (error) {
       console.error("Erro ao atualizar status:", error)
       alert("Erro ao atualizar status")
@@ -1106,10 +1107,11 @@ export default function Dashboard() {
               {/* Área do usuário com hover */}
               <div 
                 className="relative"
-                onMouseEnter={() => setShowHeaderInfo(true)}
+                
+                onClick={() => setShowHeaderInfo(true)}
                 onMouseLeave={() => setShowHeaderInfo(false)}
               >
-                <div className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg cursor-pointer transition-all duration-200">
+                <div className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg cursor-pointer transition-all duration-1600">
                   {currentUser?.avatar ? (
                     <img
                       src={currentUser.avatar}
@@ -1124,7 +1126,7 @@ export default function Dashboard() {
 
                 {/* Dropdown com informações do usuário */}
                 {showHeaderInfo && (
-                  <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
+                  <div className="absolute right-0 top-9 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
                     <div className="p-4">
                       <div className="flex items-center space-x-3 mb-4">
                         {currentUser?.avatar ? (
@@ -1172,15 +1174,20 @@ export default function Dashboard() {
         <div className="glass-effect rounded-xl shadow-lg border border-white/20 mb-8">
           <div className="border-b border-gray-200">
             <nav className="flex space-x-8 px-6">
+              {/* Aba Novo Ticket - completamente oculta quando não visível */}
               {currentUser?.role === "Tecnico" && isTabVisible("novo") && (
                 <button
                   onClick={() => setActiveTab("novo")}
                   className={cn("tab-button", activeTab === "novo" ? "active" : "")}
                 >
                   ➕ Novo Ticket
+                  <span className="ml-2 text-gray-400">
+                    {activeTab === "novo" ? "˄" : "˅"}
+                  </span>
                 </button>
               )}
 
+              {/* Aba Tickets */}
               {isTabVisible("tickets") && (
                 <button
                   onClick={() => setActiveTab("tickets")}
@@ -1190,9 +1197,13 @@ export default function Dashboard() {
                   <span className="ml-2 bg-emerald-100 text-emerald-800 text-xs px-2 py-1 rounded-full">
                     {filteredTickets.length}
                   </span>
+                  <span className="ml-2 text-gray-400">
+                    {activeTab === "tickets" ? "˄" : "˅"}
+                  </span>
                 </button>
               )}
 
+              {/* Aba Dashboard */}
               {isTabVisible("dashboard") && (
                 <button
                   onClick={() => {
@@ -1202,9 +1213,13 @@ export default function Dashboard() {
                   className={cn("tab-button", activeTab === "dashboard" ? "active" : "")}
                 >
                   📊 Meu Dashboard
+                  <span className="ml-2 text-gray-400">
+                    {activeTab === "dashboard" ? "˄" : "˅"}
+                  </span>
                 </button>
               )}
 
+              {/* Aba Usuários - apenas para Supervisores */}
               {currentUser?.role === "Supervisor" && (
                 <button
                   onClick={() => setActiveTab("usuarios")}
@@ -1213,6 +1228,9 @@ export default function Dashboard() {
                   👥 Usuários
                   <span className="ml-2 bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full">
                     {users.length}
+                  </span>
+                  <span className="ml-2 text-gray-400">
+                    {activeTab === "usuarios" ? "˄" : "˅"}
                   </span>
                 </button>
               )}
@@ -1239,8 +1257,8 @@ export default function Dashboard() {
           </div>
 
           <div className="p-6">
-            {/* Tab: Novo Ticket */}
-            {activeTab === "novo" && currentUser?.role === "Tecnico" && (
+            {/* Tab: Novo Ticket - completamente oculta quando não visível */}
+            {activeTab === "novo" && currentUser?.role === "Tecnico" && isTabVisible("novo") && (
               <div className="max-w-2xl fade-in">
                 <h2 className="text-2xl font-bold text-gray-800 mb-6">➕ Criar Novo Ticket</h2>
 
@@ -2579,148 +2597,6 @@ export default function Dashboard() {
             padding: 12px 0;
           }
         }
-
-        {/* Modal de Perfil */}
-        {showProfileModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="glass-effect rounded-xl shadow-2xl border border-white/20 max-w-md w-full max-h-[90vh] overflow-y-auto">
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-gray-800">👤 Meu Perfil</h2>
-                  <button
-                    onClick={closeProfileModal}
-                    className="text-gray-500 hover:text-gray-700 text-xl"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                {/* Avatar Section */}
-                <div className="mb-6 text-center">
-                  <div className="relative inline-block">
-                    <img
-                      src={avatarPreview || currentUser?.avatar || "/placeholder-user.jpg"}
-                      alt="Avatar"
-                      className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg"
-                    />
-                    <label className="absolute bottom-0 right-0 bg-blue-500 text-white rounded-full p-2 cursor-pointer hover:bg-blue-600 transition-colors">
-                      📷
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleAvatarChange}
-                        className="hidden"
-                      />
-                    </label>
-                  </div>
-                  <p className="text-sm text-gray-600 mt-2">Clique na câmera para alterar a foto</p>
-                </div>
-
-                {/* Formulário de Perfil */}
-                <form onSubmit={handleUpdateProfile} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">👤 Nome</label>
-                    <input
-                      type="text"
-                      value={profileForm.name}
-                      onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
-                      className="form-input"
-                      required
-                      disabled={loading}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">📧 Email</label>
-                    <input
-                      type="email"
-                      value={profileForm.email}
-                      onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
-                      className="form-input"
-                      disabled={loading}
-                    />
-                  </div>
-
-                  {profileSuccess && (
-                    <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
-                      ✅ {profileSuccess}
-                    </div>
-                  )}
-
-                  {profileError && (
-                    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-                      ❌ {profileError}
-                    </div>
-                  )}
-
-                  <div className="flex space-x-3 pt-4">
-                    <button type="submit" className="btn-primary flex-1" disabled={loading}>
-                      {loading ? "🔄 Salvando..." : "💾 Salvar Perfil"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={closeProfileModal}
-                      className="btn-secondary flex-1"
-                      disabled={loading}
-                    >
-                      ❌ Cancelar
-                    </button>
-                  </div>
-                </form>
-
-                {/* Separador */}
-                <div className="my-6 border-t border-gray-200"></div>
-
-                {/* Formulário de Alteração de Senha */}
-                <form onSubmit={handleChangePassword} className="space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4">🔒 Alterar Senha</h3>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">🔑 Senha Atual</label>
-                    <input
-                      type="password"
-                      value={profileForm.currentPassword}
-                      onChange={(e) => setProfileForm({ ...profileForm, currentPassword: e.target.value })}
-                      className="form-input"
-                      required
-                      disabled={loading}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">🔑 Nova Senha</label>
-                    <input
-                      type="password"
-                      value={profileForm.newPassword}
-                      onChange={(e) => setProfileForm({ ...profileForm, newPassword: e.target.value })}
-                      className="form-input"
-                      placeholder="Mínimo 6 caracteres"
-                      required
-                      disabled={loading}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">🔑 Confirmar Nova Senha</label>
-                    <input
-                      type="password"
-                      value={profileForm.confirmPassword}
-                      onChange={(e) => setProfileForm({ ...profileForm, confirmPassword: e.target.value })}
-                      className="form-input"
-                      placeholder="Digite a nova senha novamente"
-                      required
-                      disabled={loading}
-                    />
-                  </div>
-
-                  <button type="submit" className="btn-primary w-full" disabled={loading}>
-                    {loading ? "🔄 Alterando..." : "🔒 Alterar Senha"}
-                  </button>
-                </form>
-              </div>
-            </div>
-          </div>
-        )}
       `}</style>
     </div>
   )
