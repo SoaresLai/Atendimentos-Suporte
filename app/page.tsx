@@ -82,16 +82,20 @@ interface User {
 
 interface Ticket {
   id: number
+  ticket_id: string
   empresa: string
   plataforma: "INTERCOM" | "GRONERZAP"
   departamento: string
   descricao: string
   status: "Em Andamento" | "Resolvido" | "Pendente"
+  status_atendimento: "Criado" | "Em Atendimento" | "Finalizado"
   em_implementacao: boolean
   criado_por: string
   criado_em: string
   atualizado_em?: string
   atualizado_por?: string
+  iniciado_em?: string
+  finalizado_em?: string
 }
 
 interface UserStats {
@@ -933,6 +937,54 @@ export default function Dashboard() {
     return emojis[dept] || "📋"
   }
 
+  // Função para obter cor do status de atendimento
+  const getStatusAtendimentoColor = (status: string) => {
+    switch (status) {
+      case "Criado":
+        return "bg-gray-100 text-gray-800"
+      case "Em Atendimento":
+        return "bg-blue-100 text-blue-800"
+      case "Finalizado":
+        return "bg-green-100 text-green-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
+  }
+
+  // Função para iniciar atendimento
+  const handleIniciarAtendimento = async (ticketId: number) => {
+    if (!currentUser) return
+
+    try {
+      setLoading(true)
+      await ticketService.iniciarAtendimento(ticketId, currentUser.name)
+      await loadTickets()
+      toast({ description: "Atendimento iniciado com sucesso!" })
+    } catch (error) {
+      console.error("Erro ao iniciar atendimento:", error)
+      alert("Erro ao iniciar atendimento")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Função para finalizar atendimento
+  const handleFinalizarAtendimento = async (ticketId: number) => {
+    if (!currentUser) return
+
+    try {
+      setLoading(true)
+      await ticketService.finalizarAtendimento(ticketId, currentUser.name)
+      await loadTickets()
+      toast({ description: "Atendimento finalizado com sucesso!" })
+    } catch (error) {
+      console.error("Erro ao finalizar atendimento:", error)
+      alert("Erro ao finalizar atendimento")
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // Cálculos das métricas gerais (baseado nos tickets visíveis para o usuário)
   const visibleTickets =
     currentUser?.role === "Supervisor" ? tickets : tickets.filter((t) => t.criado_por === currentUser?.name)
@@ -1500,6 +1552,12 @@ export default function Dashboard() {
                           <div className="flex-1">
                             <div className="flex items-center space-x-3 mb-2">
                               <h3 className="text-lg font-semibold text-gray-800">🏢 {ticket.empresa}</h3>
+                              <span className="status-badge bg-emerald-100 text-emerald-800">🆔 {ticket.ticket_id}</span>
+                              <span className={cn("status-badge", getStatusAtendimentoColor(ticket.status_atendimento))}>
+                                {ticket.status_atendimento === "Criado" && "📝"}
+                                {ticket.status_atendimento === "Em Atendimento" && "🔄"}
+                                {ticket.status_atendimento === "Finalizado" && "✅"} {ticket.status_atendimento}
+                              </span>
                               {ticket.em_implementacao && (
                                 <span className="status-badge bg-orange-100 text-orange-800">⚙️ Em Implementação</span>
                               )}
@@ -1556,6 +1614,30 @@ export default function Dashboard() {
                             )}
 
                             <div className="flex space-x-1">
+                              {/* Botão de iniciar atendimento */}
+                              {ticket.status_atendimento === "Criado" && (
+                                <button
+                                  onClick={() => handleIniciarAtendimento(ticket.id)}
+                                  className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs"
+                                  title="Iniciar atendimento"
+                                  disabled={loading}
+                                >
+                                  🚀
+                                </button>
+                              )}
+
+                              {/* Botão de finalizar atendimento */}
+                              {ticket.status_atendimento === "Em Atendimento" && (
+                                <button
+                                  onClick={() => handleFinalizarAtendimento(ticket.id)}
+                                  className="bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded text-xs"
+                                  title="Finalizar atendimento"
+                                  disabled={loading}
+                                >
+                                  ✅
+                                </button>
+                              )}
+
                               {/* Botão de editar status - apenas para o criador do ticket */}
                               {currentUser?.name === ticket.criado_por && editingTicket !== ticket.id && (
                                 <button

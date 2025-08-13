@@ -19,16 +19,20 @@ export interface User {
 
 export interface Ticket {
   id: number
+  ticket_id: string // ID único para exibição
   empresa: string
   plataforma: "INTERCOM" | "GRONERZAP"
   departamento: string
   descricao: string
   status: "Em Andamento" | "Resolvido" | "Pendente"
+  status_atendimento: "Criado" | "Em Atendimento" | "Finalizado" // Novo campo
   em_implementacao: boolean
   criado_por: string
   criado_em: string
   atualizado_em?: string
   atualizado_por?: string
+  iniciado_em?: string // Quando o atendimento foi iniciado
+  finalizado_em?: string // Quando o atendimento foi finalizado
 }
 
 // Funções para usuários
@@ -159,6 +163,41 @@ export const userService = {
   },
 }
 
+// Função para gerar ID único de ticket
+const generateTicketId = () => {
+  const timestamp = Date.now().toString(36)
+  const random = Math.random().toString(36).substr(2, 5)
+  return `TKT-${timestamp}-${random}`.toUpperCase()
+}
+
+// Função para gerar mensagem automática
+const generateAutoMessage = (analystName: string, ticketId: string) => {
+  return `Você está na fila para atendimento com o Time de Suporte Groner.
+
+Atualmente, estamos ajudando outros clientes que entraram antes, mas assim que chegar sua vez o ${analystName} vai falar com você.
+
+💡 Pra agilizar: já nos conte aqui o que está acontecendo, assim começamos preparados. 😉
+
+⏳ Previsão de início: 30 minutos
+💬 Próximo passo: o ${analystName} enviará mensagem quando iniciar seu atendimento.
+
+🆔 Ticket ID: ${ticketId}`
+}
+
+// Função para gerar mensagem de início de atendimento
+const generateStartMessage = (analystName: string, departamento: string) => {
+  const horas = departamento === "Engenharia" ? 8 : 4
+  return `✅ Seu atendimento com o Time de Suporte Groner foi iniciado!
+Eu sou o ${analystName} e vou acompanhar sua solicitação.
+
+Temos até ${horas} horas para concluir a resolução do seu problema. Para aproveitar ao máximo esse tempo, poderia confirmar ou complementar as informações que já nos enviou? Assim conseguimos agir de forma mais rápida e eficiente. 😉`
+}
+
+// Função para obter tempo por departamento
+const getTempoPorDepartamento = (departamento: string) => {
+  return departamento === "Engenharia" ? 8 : 4
+}
+
 // Funções para tickets
 export const ticketService = {
   async getAllTickets() {
@@ -188,14 +227,67 @@ export const ticketService = {
     criado_por: string
     status: "Em Andamento" | "Resolvido" | "Pendente"
   }) {
+    const ticketId = generateTicketId()
+    const autoMessage = generateAutoMessage(ticketData.criado_por, ticketId)
+    
     const { data, error } = await supabase
       .from("tickets")
       .insert([
         {
           ...ticketData,
+          ticket_id: ticketId,
+          status_atendimento: "Criado",
+          descricao: `${autoMessage}\n\n---\n\n${ticketData.descricao}`,
           criado_em: new Date().toISOString(),
         },
       ])
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  },
+
+  async iniciarAtendimento(ticketId: number, analystName: string) {
+    // Buscar o ticket para obter o departamento
+    const { data: ticket, error: fetchError } = await supabase
+      .from("tickets")
+      .select("departamento, descricao")
+      .eq("id", ticketId)
+      .single()
+
+    if (fetchError) throw fetchError
+
+    const startMessage = generateStartMessage(analystName, ticket.departamento)
+    const novaDescricao = `${ticket.descricao}\n\n---\n\n${startMessage}`
+
+    const { data, error } = await supabase
+      .from("tickets")
+      .update({
+        status_atendimento: "Em Atendimento",
+        iniciado_em: new Date().toISOString(),
+        descricao: novaDescricao,
+        atualizado_por: analystName,
+        atualizado_em: new Date().toISOString(),
+      })
+      .eq("id", ticketId)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  },
+
+  async finalizarAtendimento(ticketId: number, analystName: string) {
+    const { data, error } = await supabase
+      .from("tickets")
+      .update({
+        status_atendimento: "Finalizado",
+        finalizado_em: new Date().toISOString(),
+        atualizado_por: analystName,
+        atualizado_em: new Date().toISOString(),
+      })
+      .eq("id", ticketId)
       .select()
       .single()
 

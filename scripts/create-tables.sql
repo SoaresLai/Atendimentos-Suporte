@@ -10,19 +10,23 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Criar tabela de tickets
+-- Tabela de tickets
 CREATE TABLE IF NOT EXISTS tickets (
   id SERIAL PRIMARY KEY,
-  empresa VARCHAR(100) NOT NULL,
-  plataforma VARCHAR(20) NOT NULL CHECK (plataforma IN ('INTERCOM', 'GRONERZAP')),
-  departamento VARCHAR(50) NOT NULL,
+  ticket_id VARCHAR(50) UNIQUE NOT NULL, -- ID único para exibição
+  empresa VARCHAR(255) NOT NULL,
+  plataforma VARCHAR(50) NOT NULL CHECK (plataforma IN ('INTERCOM', 'GRONERZAP')),
+  departamento VARCHAR(100) NOT NULL,
   descricao TEXT NOT NULL,
-  status VARCHAR(20) NOT NULL DEFAULT 'Em Andamento' CHECK (status IN ('Em Andamento', 'Resolvido', 'Pendente')),
+  status VARCHAR(50) NOT NULL DEFAULT 'Pendente' CHECK (status IN ('Em Andamento', 'Resolvido', 'Pendente')),
+  status_atendimento VARCHAR(50) NOT NULL DEFAULT 'Criado' CHECK (status_atendimento IN ('Criado', 'Em Atendimento', 'Finalizado')),
   em_implementacao BOOLEAN DEFAULT FALSE,
-  criado_por VARCHAR(100) NOT NULL,
+  criado_por VARCHAR(255) NOT NULL,
   criado_em TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  atualizado_por VARCHAR(100),
-  atualizado_em TIMESTAMP WITH TIME ZONE
+  atualizado_em TIMESTAMP WITH TIME ZONE,
+  atualizado_por VARCHAR(255),
+  iniciado_em TIMESTAMP WITH TIME ZONE,
+  finalizado_em TIMESTAMP WITH TIME ZONE
 );
 
 -- Criar índices para melhor performance
