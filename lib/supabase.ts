@@ -13,6 +13,8 @@ export interface User {
   role: "Supervisor" | "Tecnico"
   department: string
   password_hash: string
+  email?: string
+  avatar?: string
   created_at: string
   updated_at: string
 }
@@ -51,6 +53,8 @@ export const userService = {
         name: data.name,
         role: data.role as "Supervisor" | "Tecnico",
         department: data.department,
+        email: data.email || undefined,
+        avatar: data.avatar || undefined,
       }
     }
     return null
@@ -66,12 +70,24 @@ export const userService = {
     return data || []
   },
 
+  async getUserById(userId: number) {
+    const { data, error } = await supabase
+      .from("users")
+      .select("id, username, name, role, department, email, avatar, created_at")
+      .eq("id", userId)
+      .single()
+
+    if (error) throw error
+    return data
+  },
+
   async createUser(userData: {
     username: string
     name: string
     role: "Supervisor" | "Tecnico"
     department: string
     password: string
+    email?: string
   }) {
     const passwordHash = btoa(userData.password + "SaltKey2024")
 
@@ -84,6 +100,7 @@ export const userService = {
           role: userData.role,
           department: userData.department,
           password_hash: passwordHash,
+          email: userData.email || null,
         },
       ])
       .select()
@@ -93,20 +110,68 @@ export const userService = {
     return data
   },
 
-  async checkUsernameExists(username: string) {
-    const { data, error } = await supabase.from("users").select("id").eq("username", username).single()
+  async updateUser(
+    userId: number,
+    userData: {
+      username?: string
+      name?: string
+      role?: "Supervisor" | "Tecnico"
+      department?: string
+      email?: string
+      password?: string
+    },
+  ) {
+    const updateData: any = {
+      updated_at: new Date().toISOString(),
+    }
+
+    if (userData.username) updateData.username = userData.username
+    if (userData.name) updateData.name = userData.name
+    if (userData.role) updateData.role = userData.role
+    if (userData.department) updateData.department = userData.department
+    if (userData.email !== undefined) updateData.email = userData.email || null
+    if (userData.password) {
+      updateData.password_hash = btoa(userData.password + "SaltKey2024")
+    }
+
+    const { data, error } = await supabase.from("users").update(updateData).eq("id", userId).select().single()
+
+    if (error) throw error
+    return data
+  },
+
+  async deleteUser(userId: number) {
+    const { error } = await supabase.from("users").delete().eq("id", userId)
+
+    if (error) throw error
+  },
+
+  async checkUsernameExists(username: string, excludeUserId?: number) {
+    let query = supabase.from("users").select("id").eq("username", username)
+
+    if (excludeUserId) {
+      query = query.neq("id", excludeUserId)
+    }
+
+    const { data, error } = await query.single()
 
     return !error && data
   },
 
-  async updateProfile(userId: number, updates: {
-    name?: string
-    email?: string
-    avatar?: string
-  }) {
+  async updateProfile(
+    userId: number,
+    updates: {
+      name?: string
+      email?: string
+      avatar?: string
+    },
+  ) {
     const { data, error } = await supabase
       .from("users")
-      .update(updates)
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", userId)
       .select()
       .single()
@@ -135,30 +200,31 @@ export const userService = {
     const newPasswordHash = btoa(newPassword + "SaltKey2024")
     const { error: updateError } = await supabase
       .from("users")
-      .update({ password_hash: newPasswordHash })
+      .update({
+        password_hash: newPasswordHash,
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", userId)
 
     if (updateError) throw updateError
   },
 
   async uploadAvatar(userId: number, file: File) {
-    const fileExt = file.name.split('.').pop()
+    const fileExt = file.name.split(".").pop()
     const fileName = `${userId}-${Date.now()}.${fileExt}`
-    
-    const { data, error } = await supabase.storage
-      .from('avatars')
-      .upload(fileName, file)
+
+    const { data, error } = await supabase.storage.from("avatars").upload(fileName, file)
 
     if (error) throw error
 
     // Obter URL pública
-    const { data: { publicUrl } } = supabase.storage
-      .from('avatars')
-      .getPublicUrl(fileName)
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from("avatars").getPublicUrl(fileName)
 
     // Atualizar perfil do usuário
     await this.updateProfile(userId, { avatar: publicUrl })
-    
+
     return publicUrl
   },
 }
@@ -229,7 +295,7 @@ export const ticketService = {
   }) {
     const ticketId = generateTicketId()
     const autoMessage = generateAutoMessage(ticketData.criado_por, ticketId)
-    
+
     const { data, error } = await supabase
       .from("tickets")
       .insert([
@@ -300,6 +366,22 @@ export const ticketService = {
       .from("tickets")
       .update({
         status,
+        atualizado_por: updatedBy,
+        atualizado_em: new Date().toISOString(),
+      })
+      .eq("id", ticketId)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  },
+
+  async updateTicketDescription(ticketId: number, descricao: string, updatedBy: string) {
+    const { data, error } = await supabase
+      .from("tickets")
+      .update({
+        descricao,
         atualizado_por: updatedBy,
         atualizado_em: new Date().toISOString(),
       })

@@ -2,8 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
-import { userService, ticketService, supabase } from "@/lib/supabase"
-import { AuthInvalidTokenResponseError } from "@supabase/supabase-js"
+import { userService, ticketService } from "@/lib/supabase"
 import { toast } from "@/hooks/use-toast"
 
 interface User {
@@ -27,13 +26,13 @@ interface AuthToken {
 const TOKEN_KEY = "auth_token"
 const TOKEN_EXPIRY_HOURS = 24
 
-const genereteToken = (user : User) : AuthToken => {
-  const expiresAt = Date.now() + (TOKEN_EXPIRY_HOURS * 60 * 60 * 1000)
+const genereteToken = (user: User): AuthToken => {
+  const expiresAt = Date.now() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000
   const token = btoa(JSON.stringify({ user, expiresAt }))
-  return { token, user, expiresAt}
+  return { token, user, expiresAt }
 }
 
-const saveToken = (authToken : AuthToken) => {
+const saveToken = (authToken: AuthToken) => {
   localStorage.setItem(TOKEN_KEY, JSON.stringify(authToken))
 }
 
@@ -49,7 +48,7 @@ const getToken = (): AuthToken | null => {
       localStorage.removeItem(TOKEN_KEY)
       return null
     }
-    
+
     return authToken
   } catch (error) {
     localStorage.removeItem(TOKEN_KEY)
@@ -62,22 +61,13 @@ const removeToken = () => {
 }
 
 const isTokenValid = (): boolean => {
-    const token = getToken()
-    return token !== null
+  const token = getToken()
+  return token !== null
 }
 
 // Função utilitária para classes CSS
 function cn(...classes: string[]) {
   return classes.filter(Boolean).join(" ")
-}
-
-// Tipos
-interface User {
-  id: number
-  username: string
-  name: string
-  role: "Supervisor" | "Tecnico"
-  department: string
 }
 
 interface Ticket {
@@ -151,6 +141,41 @@ const calculateMonthlyActivity = (tickets: Ticket[]): { mes: string; tickets: nu
   }))
 }
 
+// Componente para renderizar mensagens em blocos
+const MessageBlock = ({ message, isSystem = false }: { message: string; isSystem?: boolean }) => {
+  return (
+    <div className={`message-block ${isSystem ? "system-message" : "user-message"}`}>
+      <div className="message-content">
+        {message.split("\n").map((line, index) => (
+          <div key={index} className="message-line">
+            {line || <br />}
+          </div>
+        ))}
+      </div>
+      <div className="message-timestamp">
+        {new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+      </div>
+    </div>
+  )
+}
+
+// Componente para exibir descrição como mensagens
+const DescriptionMessages = ({ description }: { description: string }) => {
+  const messages = description.split("\n\n---\n\n")
+
+  return (
+    <div className="messages-container">
+      {messages.map((message, index) => (
+        <MessageBlock
+          key={index}
+          message={message.trim()}
+          isSystem={index === 0 || message.includes("✅ Seu atendimento")}
+        />
+      ))}
+    </div>
+  )
+}
+
 export default function Dashboard() {
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -193,6 +218,10 @@ export default function Dashboard() {
   const [editStatus, setEditStatus] = useState<"Em Andamento" | "Resolvido" | "Pendente">("Em Andamento")
   const [selectedUserFilter, setSelectedUserFilter] = useState("")
 
+  // Estados para edição de descrição
+  const [editingDescription, setEditingDescription] = useState<number | null>(null)
+  const [editDescriptionText, setEditDescriptionText] = useState("")
+
   // Estados para adicionar usuário
   const [showAddUserModal, setShowAddUserModal] = useState(false)
   const [newUser, setNewUser] = useState({
@@ -200,10 +229,25 @@ export default function Dashboard() {
     name: "",
     role: "Tecnico" as "Supervisor" | "Tecnico",
     department: "",
+    email: "",
     password: "",
     confirmPassword: "",
   })
   const [addUserError, setAddUserError] = useState("")
+
+  // Estados para editar usuário
+  const [showEditUserModal, setShowEditUserModal] = useState(false)
+  const [editingUser, setEditingUser] = useState<User | null>(null)
+  const [editUserForm, setEditUserForm] = useState({
+    username: "",
+    name: "",
+    role: "Tecnico" as "Supervisor" | "Tecnico",
+    department: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+  })
+  const [editUserError, setEditUserError] = useState("")
 
   // Estados do perfil
   const [showProfileModal, setShowProfileModal] = useState(false)
@@ -264,7 +308,7 @@ export default function Dashboard() {
     const file = e.target.files?.[0]
     if (file) {
       setAvatarFile(file)
-      
+
       // Criar preview
       const reader = new FileReader()
       reader.onload = (e) => {
@@ -284,36 +328,55 @@ export default function Dashboard() {
     try {
       setLoading(true)
 
-      // Upload de avatar se houver
+      // Upload de avatar se houver (só funciona se a coluna existir)
       let avatarUrl = currentUser.avatar
       if (avatarFile) {
-        setUploadingAvatar(true)
-        avatarUrl = await userService.uploadAvatar(currentUser.id, avatarFile)
-        setUploadingAvatar(false)
+        try {
+          setUploadingAvatar(true)
+          avatarUrl = await userService.uploadAvatar(currentUser.id, avatarFile)
+          setUploadingAvatar(false)
+        } catch (error) {
+          console.warn("Avatar upload não disponível ainda:", error)
+          setUploadingAvatar(false)
+        }
       }
 
-      // Atualizar perfil
-      const updatedUser = await userService.updateProfile(currentUser.id, {
-        name: profileForm.name,
-        email: profileForm.email,
-        avatar: avatarUrl,
-      })
+      // Atualizar perfil (só campos que existem)
+      try {
+        const updatedUser = await userService.updateProfile(currentUser.id, {
+          name: profileForm.name,
+          email: profileForm.email,
+          avatar: avatarUrl,
+        })
 
-      // Atualizar usuário atual
-      setCurrentUser({
-        ...currentUser,
-        name: updatedUser.name,
-        email: updatedUser.email,
-        avatar: updatedUser.avatar,
-      })
+        // Atualizar usuário atual
+        const newUser = {
+          ...currentUser,
+          name: updatedUser.name,
+          email: updatedUser.email || currentUser.email,
+          avatar: updatedUser.avatar || currentUser.avatar,
+        }
 
-      setProfileSuccess("Perfil atualizado com sucesso!")
-      
+        setCurrentUser(newUser)
+
+        // Atualizar token no localStorage
+        const authToken = getToken()
+        if (authToken) {
+          const newAuthToken = { ...authToken, user: newUser }
+          saveToken(newAuthToken)
+        }
+
+        setProfileSuccess("Perfil atualizado com sucesso!")
+      } catch (error) {
+        // Se as colunas não existem, atualizar apenas o nome
+        console.warn("Algumas funcionalidades de perfil não estão disponíveis ainda")
+        setProfileSuccess("Nome atualizado! Execute os scripts SQL para funcionalidades completas.")
+      }
+
       // Fechar modal após 2 segundos
       setTimeout(() => {
         closeProfileModal()
       }, 2000)
-
     } catch (error) {
       console.error("Erro ao atualizar perfil:", error)
       setProfileError("Erro ao atualizar perfil")
@@ -342,15 +405,11 @@ export default function Dashboard() {
 
     try {
       setLoading(true)
-      
-      await userService.changePassword(
-        currentUser.id,
-        profileForm.currentPassword,
-        profileForm.newPassword
-      )
+
+      await userService.changePassword(currentUser.id, profileForm.currentPassword, profileForm.newPassword)
 
       setProfileSuccess("Senha alterada com sucesso!")
-      
+
       // Limpar campos de senha
       setProfileForm({
         ...profileForm,
@@ -358,7 +417,6 @@ export default function Dashboard() {
         newPassword: "",
         confirmPassword: "",
       })
-
     } catch (error) {
       console.error("Erro ao alterar senha:", error)
       setProfileError(error instanceof Error ? error.message : "Erro ao alterar senha")
@@ -406,7 +464,7 @@ export default function Dashboard() {
       setTickets(data)
     } catch (error) {
       console.error("Erro ao carregar tickets:", error)
-      alert("Erro ao carregar tickets")
+      toast({ description: "Erro ao carregar tickets", variant: "destructive" })
     } finally {
       setLoading(false)
     }
@@ -450,6 +508,7 @@ export default function Dashboard() {
         name: newUser.name,
         role: newUser.role,
         department: newUser.department,
+        email: newUser.email || undefined,
         password: newUser.password,
       })
 
@@ -462,18 +521,19 @@ export default function Dashboard() {
         name: "",
         role: "Tecnico",
         department: "",
+        email: "",
         password: "",
         confirmPassword: "",
       })
       setShowAddUserModal(false)
-      toast({ description: "Usuário adicionado com sucesso!"})
+      toast({ description: "Usuário adicionado com sucesso!" })
     } catch (error) {
       console.error("Erro ao adicionar usuário:", error)
       setAddUserError("Erro ao adicionar usuário")
     }
   }
-      
-  // Função para fechar modal
+
+  // Função para fechar modal de adicionar
   const closeAddUserModal = () => {
     setShowAddUserModal(false)
     setAddUserError("")
@@ -482,9 +542,131 @@ export default function Dashboard() {
       name: "",
       role: "Tecnico",
       department: "",
+      email: "",
       password: "",
       confirmPassword: "",
     })
+  }
+
+  // Função para abrir modal de edição
+  const openEditUserModal = async (user: User) => {
+    try {
+      // Buscar dados completos do usuário
+      const fullUser = await userService.getUserById(user.id)
+      setEditingUser(fullUser)
+      setEditUserForm({
+        username: fullUser.username,
+        name: fullUser.name,
+        role: fullUser.role,
+        department: fullUser.department,
+        email: fullUser.email || "",
+        password: "",
+        confirmPassword: "",
+      })
+      setShowEditUserModal(true)
+      setEditUserError("")
+    } catch (error) {
+      console.error("Erro ao carregar dados do usuário:", error)
+      toast({ description: "Erro ao carregar dados do usuário", variant: "destructive" })
+    }
+  }
+
+  // Função para fechar modal de edição
+  const closeEditUserModal = () => {
+    setShowEditUserModal(false)
+    setEditingUser(null)
+    setEditUserForm({
+      username: "",
+      name: "",
+      role: "Tecnico",
+      department: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+    })
+    setEditUserError("")
+  }
+
+  // Função para editar usuário
+  const handleEditUser = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setEditUserError("")
+
+    if (!editingUser) return
+
+    // Validações
+    if (editUserForm.password && editUserForm.password !== editUserForm.confirmPassword) {
+      setEditUserError("As senhas não coincidem")
+      return
+    }
+
+    if (editUserForm.password && editUserForm.password.length < 6) {
+      setEditUserError("A senha deve ter pelo menos 6 caracteres")
+      return
+    }
+
+    try {
+      // Verificar se o username já existe (excluindo o usuário atual)
+      if (editUserForm.username !== editingUser.username) {
+        const usernameExists = await userService.checkUsernameExists(editUserForm.username, editingUser.id)
+        if (usernameExists) {
+          setEditUserError("Nome de usuário já existe")
+          return
+        }
+      }
+
+      const updateData: any = {
+        username: editUserForm.username,
+        name: editUserForm.name,
+        role: editUserForm.role,
+        department: editUserForm.department,
+        email: editUserForm.email || undefined,
+      }
+
+      if (editUserForm.password) {
+        updateData.password = editUserForm.password
+      }
+
+      await userService.updateUser(editingUser.id, updateData)
+
+      // Recarregar lista de usuários
+      await loadUsers()
+
+      closeEditUserModal()
+      toast({ description: "Usuário atualizado com sucesso!" })
+    } catch (error) {
+      console.error("Erro ao atualizar usuário:", error)
+      setEditUserError("Erro ao atualizar usuário")
+    }
+  }
+
+  // Função para excluir usuário
+  const handleDeleteUser = async (user: User) => {
+    if (user.id === currentUser?.id) {
+      toast({ description: "Você não pode excluir seu próprio usuário", variant: "destructive" })
+      return
+    }
+
+    // Verificar se o usuário tem tickets
+    const userTickets = tickets.filter((t) => t.criado_por === user.name)
+    if (userTickets.length > 0) {
+      const confirmDelete = confirm(
+        `O usuário ${user.name} possui ${userTickets.length} ticket(s). Tem certeza que deseja excluí-lo? Os tickets permanecerão no sistema.`,
+      )
+      if (!confirmDelete) return
+    } else {
+      const confirmDelete = confirm(`Tem certeza que deseja excluir o usuário ${user.name}?`)
+      if (!confirmDelete) return
+    }
+
+    try {
+      await userService.deleteUser(user.id)
+      await loadUsers()
+      toast({ description: "Usuário excluído com sucesso!" })
+    } catch (error) {
+      console.error("Erro ao excluir usuário:", error)
+      toast({ description: "Erro ao excluir usuário", variant: "destructive" })
+    }
   }
 
   // Aplicar filtros baseados no usuário e filtros selecionados
@@ -587,7 +769,7 @@ export default function Dashboard() {
       setActiveTab(user.role === "Supervisor" ? "tickets" : "novo")
 
       //limpar forms
-      setLoginForm({ username: "", password: "", remember: false})
+      setLoginForm({ username: "", password: "", remember: false })
     } catch (error) {
       console.error("Erro no login:", error)
       setLoginError("Erro ao fazer login")
@@ -606,18 +788,14 @@ export default function Dashboard() {
     setTickets([])
     setFilteredTickets([])
     setUsers([])
-    
+
     // limpa forms login
-    setLoginForm({ username: "", password: "", remember:false})
+    setLoginForm({ username: "", password: "", remember: false })
   }
 
   // Funções para gerenciar abas
   const toggleTabVisibility = (tabName: string) => {
-    setHiddenTabs(prev => 
-      prev.includes(tabName) 
-        ? prev.filter(tab => tab !== tabName)
-        : [...prev, tabName]
-    )
+    setHiddenTabs((prev) => (prev.includes(tabName) ? prev.filter((tab) => tab !== tabName) : [...prev, tabName]))
   }
 
   const isTabVisible = (tabName: string) => {
@@ -661,165 +839,6 @@ export default function Dashboard() {
     }
   }, [hiddenTabs, activeTab, isLoggedIn, currentUser])
 
-  {/* Botão de Perfil */}
-<button
-  onClick={openProfileModal}
-  className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all duration-200 shadow-lg hover:shadow-xl"
->
-  {currentUser?.avatar ? (
-    <img
-      src={currentUser.avatar}
-      alt={currentUser.name}
-      className="w-6 h-6 rounded-full object-cover"
-    />
-  ) : (
-    <span className="text-lg">👤</span>
-  )}
-  <span className="hidden sm:inline">Meu Perfil</span>
-</button>
-
-{/* Modal de Perfil */}
-{showProfileModal && (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <div className="glass-effect rounded-xl shadow-2xl border border-white/20 max-w-md w-full max-h-[90vh] overflow-y-auto">
-      <div className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-gray-800">👤 Meu Perfil</h2>
-          <button
-            onClick={closeProfileModal}
-            className="text-gray-500 hover:text-gray-700 text-xl"
-          >
-            ✕
-          </button>
-        </div>
-
-        {/* Avatar Section */}
-        <div className="mb-6 text-center">
-          <div className="relative inline-block">
-            <img
-              src={avatarPreview || currentUser?.avatar || "/placeholder-user.jpg"}
-              alt="Avatar"
-              className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg"
-            />
-            <label className="absolute bottom-0 right-0 bg-blue-500 text-white rounded-full p-2 cursor-pointer hover:bg-blue-600 transition-colors">
-              📷
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleAvatarChange}
-                className="hidden"
-              />
-            </label>
-          </div>
-          <p className="text-sm text-gray-600 mt-2">Clique na câmera para alterar a foto</p>
-        </div>
-
-        {/* Formulário de Perfil */}
-        <form onSubmit={handleUpdateProfile} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">👤 Nome</label>
-            <input
-              type="text"
-              value={profileForm.name}
-              onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
-              className="form-input"
-              required
-              disabled={loading}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">📧 Email</label>
-            <input
-              type="email"
-              value={profileForm.email}
-              onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
-              className="form-input"
-              disabled={loading}
-            />
-          </div>
-
-          {profileSuccess && (
-            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
-              ✅ {profileSuccess}
-            </div>
-          )}
-
-          {profileError && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-              ❌ {profileError}
-            </div>
-          )}
-
-          <div className="flex space-x-3 pt-4">
-            <button type="submit" className="btn-primary flex-1" disabled={loading}>
-              {loading ? "🔄 Salvando..." : "💾 Salvar Perfil"}
-            </button>
-            <button
-              type="button"
-              onClick={closeProfileModal}
-              className="btn-secondary flex-1"
-              disabled={loading}
-            >
-              ❌ Cancelar
-            </button>
-          </div>
-        </form>
-
-        {/* Separador */}
-        <div className="my-6 border-t border-gray-200"></div>
-
-        {/* Formulário de Alteração de Senha */}
-        <form onSubmit={handleChangePassword} className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">🔒 Alterar Senha</h3>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">🔑 Senha Atual</label>
-            <input
-              type="password"
-              value={profileForm.currentPassword}
-              onChange={(e) => setProfileForm({ ...profileForm, currentPassword: e.target.value })}
-              className="form-input"
-              required
-              disabled={loading}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">🔑 Nova Senha</label>
-            <input
-              type="password"
-              value={profileForm.newPassword}
-              onChange={(e) => setProfileForm({ ...profileForm, newPassword: e.target.value })}
-              className="form-input"
-              placeholder="Mínimo 6 caracteres"
-              required
-              disabled={loading}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">🔑 Confirmar Nova Senha</label>
-            <input
-              type="password"
-              value={profileForm.confirmPassword}
-              onChange={(e) => setProfileForm({ ...profileForm, confirmPassword: e.target.value })}
-              className="form-input"
-              placeholder="Digite a nova senha novamente"
-              required
-              disabled={loading}
-            />
-          </div>
-
-          <button type="submit" className="btn-primary w-full" disabled={loading}>
-            {loading ? "🔄 Alterando..." : "🔒 Alterar Senha"}
-          </button>
-        </form>
-      </div>
-    </div>
-  </div>
-)}
-
   // Função para criar novo ticket
   const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -853,12 +872,11 @@ export default function Dashboard() {
       toast({ description: "Ticket criado com sucesso!" })
     } catch (error) {
       console.error("Erro ao criar ticket", error)
-      alert("Erro ao criar ticket")
+      toast({ description: "Erro ao criar ticket", variant: "destructive" })
     } finally {
       setLoading(false)
     }
   }
-
 
   // Função para limpar filtros
   const clearFilters = () => {
@@ -880,13 +898,14 @@ export default function Dashboard() {
       try {
         await ticketService.deleteTicket(ticketId)
         await loadTickets()
-        toast({ description: "Ticket excluído com sucesso!"})
+        toast({ description: "Ticket excluído com sucesso!" })
       } catch (error) {
         console.error("Erro ao excluir ticket:", error)
-        alert("Erro ao excluir ticket")
+        toast({ description: "Erro ao excluir ticket", variant: "destructive" })
       }
+    }
   }
-}
+
   // Função para editar status do ticket
   const handleEditStatus = async (ticketId: number, newStatus: "Em Andamento" | "Resolvido" | "Pendente") => {
     if (!currentUser) return
@@ -898,7 +917,23 @@ export default function Dashboard() {
       toast({ description: "Status atualizado com sucesso!" })
     } catch (error) {
       console.error("Erro ao atualizar status:", error)
-      alert("Erro ao atualizar status")
+      toast({ description: "Erro ao atualizar status", variant: "destructive" })
+    }
+  }
+
+  // Função para editar descrição do ticket
+  const handleEditDescription = async (ticketId: number, newDescription: string) => {
+    if (!currentUser) return
+
+    try {
+      await ticketService.updateTicketDescription(ticketId, newDescription, currentUser.name)
+      await loadTickets()
+      setEditingDescription(null)
+      setEditDescriptionText("")
+      toast({ description: "Descrição atualizada com sucesso!" })
+    } catch (error) {
+      console.error("Erro ao atualizar descrição:", error)
+      toast({ description: "Erro ao atualizar descrição", variant: "destructive" })
     }
   }
 
@@ -906,6 +941,12 @@ export default function Dashboard() {
   const startEditing = (ticketId: number, currentStatus: "Em Andamento" | "Resolvido" | "Pendente") => {
     setEditingTicket(ticketId)
     setEditStatus(currentStatus)
+  }
+
+  // Função para iniciar edição de descrição
+  const startEditingDescription = (ticketId: number, currentDescription: string) => {
+    setEditingDescription(ticketId)
+    setEditDescriptionText(currentDescription)
   }
 
   // Função para obter cor do status
@@ -962,7 +1003,7 @@ export default function Dashboard() {
       toast({ description: "Atendimento iniciado com sucesso!" })
     } catch (error) {
       console.error("Erro ao iniciar atendimento:", error)
-      alert("Erro ao iniciar atendimento")
+      toast({ description: "Erro ao iniciar atendimento", variant: "destructive" })
     } finally {
       setLoading(false)
     }
@@ -979,7 +1020,7 @@ export default function Dashboard() {
       toast({ description: "Atendimento finalizado com sucesso!" })
     } catch (error) {
       console.error("Erro ao finalizar atendimento:", error)
-      alert("Erro ao finalizar atendimento")
+      toast({ description: "Erro ao finalizar atendimento", variant: "destructive" })
     } finally {
       setLoading(false)
     }
@@ -988,15 +1029,15 @@ export default function Dashboard() {
   // Cálculos das métricas gerais (baseado nos tickets visíveis para o usuário)
   const visibleTickets =
     currentUser?.role === "Supervisor" ? tickets : tickets.filter((t) => t.criado_por === currentUser?.name)
-  
+
   // Função para filtrar tickets por data atual
   const getTicketsByDate = (tickets: Ticket[], targetDate?: Date) => {
     const today = targetDate || new Date()
-    const todayString = today.toISOString().split('T')[0] // Formato YYYY-MM-DD
-    
+    const todayString = today.toISOString().split("T")[0] // Formato YYYY-MM-DD
+
     return tickets.filter((ticket) => {
       const ticketDate = new Date(ticket.criado_em)
-      const ticketDateString = ticketDate.toISOString().split('T')[0]
+      const ticketDateString = ticketDate.toISOString().split("T")[0]
       return ticketDateString === todayString
     })
   }
@@ -1004,7 +1045,7 @@ export default function Dashboard() {
   // Filtrar tickets do dia atual
   const todayTickets = getTicketsByDate(filteredTickets)
   const todayVisibleTickets = getTicketsByDate(visibleTickets)
-  
+
   // Métricas do dia atual
   const totalAtendimentos = todayTickets.length
   const resolvidos = todayTickets.filter((t) => t.status === "Resolvido").length
@@ -1152,21 +1193,20 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <span className="text-xs text-gray-500">
-                  {lastRefresh.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                  {lastRefresh.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                 </span>
               </div>
 
               {/* Área do usuário com hover */}
-              <div 
+              <div
                 className="relative"
-                
-                onClick={() => setShowHeaderInfo(true)}
+                onMouseEnter={() => setShowHeaderInfo(true)}
                 onMouseLeave={() => setShowHeaderInfo(false)}
               >
-                <div className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg cursor-pointer transition-all duration-1600">
+                <div className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg cursor-pointer transition-all duration-200">
                   {currentUser?.avatar ? (
                     <img
-                      src={currentUser.avatar}
+                      src={currentUser.avatar || "/placeholder.svg"}
                       alt={currentUser.name}
                       className="w-6 h-6 rounded-full object-cover"
                     />
@@ -1183,7 +1223,7 @@ export default function Dashboard() {
                       <div className="flex items-center space-x-3 mb-4">
                         {currentUser?.avatar ? (
                           <img
-                            src={currentUser.avatar}
+                            src={currentUser.avatar || "/placeholder.svg"}
                             alt={currentUser.name}
                             className="w-12 h-12 rounded-full object-cover"
                           />
@@ -1194,10 +1234,13 @@ export default function Dashboard() {
                         )}
                         <div>
                           <p className="font-medium text-gray-800">{currentUser?.name}</p>
-                          <p className="text-sm text-gray-600">{currentUser?.role} - {currentUser?.department}</p>
+                          <p className="text-sm text-gray-600">
+                            {currentUser?.role} - {currentUser?.department}
+                          </p>
+                          {currentUser?.email && <p className="text-xs text-gray-500">{currentUser.email}</p>}
                         </div>
                       </div>
-                      
+
                       <div className="space-y-2">
                         <button
                           onClick={openProfileModal}
@@ -1233,9 +1276,7 @@ export default function Dashboard() {
                   className={cn("tab-button", activeTab === "novo" ? "active" : "")}
                 >
                   ➕ Novo Ticket
-                  <span className="ml-2 text-gray-400">
-                    {activeTab === "novo" ? "˄" : "˅"}
-                  </span>
+                  <span className="ml-2 text-gray-400">{activeTab === "novo" ? "˄" : "˅"}</span>
                 </button>
               )}
 
@@ -1249,9 +1290,7 @@ export default function Dashboard() {
                   <span className="ml-2 bg-emerald-100 text-emerald-800 text-xs px-2 py-1 rounded-full">
                     {filteredTickets.length}
                   </span>
-                  <span className="ml-2 text-gray-400">
-                    {activeTab === "tickets" ? "˄" : "˅"}
-                  </span>
+                  <span className="ml-2 text-gray-400">{activeTab === "tickets" ? "˄" : "˅"}</span>
                 </button>
               )}
 
@@ -1265,9 +1304,7 @@ export default function Dashboard() {
                   className={cn("tab-button", activeTab === "dashboard" ? "active" : "")}
                 >
                   📊 Meu Dashboard
-                  <span className="ml-2 text-gray-400">
-                    {activeTab === "dashboard" ? "˄" : "˅"}
-                  </span>
+                  <span className="ml-2 text-gray-400">{activeTab === "dashboard" ? "˄" : "˅"}</span>
                 </button>
               )}
 
@@ -1281,9 +1318,7 @@ export default function Dashboard() {
                   <span className="ml-2 bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full">
                     {users.length}
                   </span>
-                  <span className="ml-2 text-gray-400">
-                    {activeTab === "usuarios" ? "˄" : "˅"}
-                  </span>
+                  <span className="ml-2 text-gray-400">{activeTab === "usuarios" ? "˄" : "˅"}</span>
                 </button>
               )}
 
@@ -1294,7 +1329,7 @@ export default function Dashboard() {
                 if (isTabVisible("tickets")) visibleTabs.push("tickets")
                 if (isTabVisible("dashboard")) visibleTabs.push("dashboard")
                 if (currentUser?.role === "Supervisor") visibleTabs.push("usuarios")
-                
+
                 if (visibleTabs.length === 0) {
                   return (
                     <div className="flex items-center space-x-2 text-gray-500">
@@ -1366,7 +1401,12 @@ export default function Dashboard() {
                       <label className="block text-sm font-medium text-gray-700 mb-2"> 📊 Status</label>
                       <select
                         value={newTicket.status}
-                        onChange={(e) => setNewTicket({ ...newTicket, status: e.target.value as "Em Andamento" | "Resolvido" | "Pendente"})}
+                        onChange={(e) =>
+                          setNewTicket({
+                            ...newTicket,
+                            status: e.target.value as "Em Andamento" | "Resolvido" | "Pendente",
+                          })
+                        }
                         className="form-input"
                         required
                         disabled={loading}
@@ -1552,8 +1592,12 @@ export default function Dashboard() {
                           <div className="flex-1">
                             <div className="flex items-center space-x-3 mb-2">
                               <h3 className="text-lg font-semibold text-gray-800">🏢 {ticket.empresa}</h3>
-                              <span className="status-badge bg-emerald-100 text-emerald-800">🆔 {ticket.ticket_id}</span>
-                              <span className={cn("status-badge", getStatusAtendimentoColor(ticket.status_atendimento))}>
+                              <span className="status-badge bg-emerald-100 text-emerald-800">
+                                🆔 {ticket.ticket_id}
+                              </span>
+                              <span
+                                className={cn("status-badge", getStatusAtendimentoColor(ticket.status_atendimento))}
+                              >
                                 {ticket.status_atendimento === "Criado" && "📝"}
                                 {ticket.status_atendimento === "Em Atendimento" && "🔄"}
                                 {ticket.status_atendimento === "Finalizado" && "✅"} {ticket.status_atendimento}
@@ -1562,7 +1606,49 @@ export default function Dashboard() {
                                 <span className="status-badge bg-orange-100 text-orange-800">⚙️ Em Implementação</span>
                               )}
                             </div>
-                            <p className="text-gray-600 mb-3">{ticket.descricao}</p>
+
+                            {/* Descrição como mensagens em blocos */}
+                            {editingDescription === ticket.id ? (
+                              <div className="mb-3">
+                                <textarea
+                                  value={editDescriptionText}
+                                  onChange={(e) => setEditDescriptionText(e.target.value)}
+                                  rows={6}
+                                  className="form-input w-full"
+                                  placeholder="Edite a descrição..."
+                                />
+                                <div className="flex space-x-2 mt-2">
+                                  <button
+                                    onClick={() => handleEditDescription(ticket.id, editDescriptionText)}
+                                    className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm"
+                                  >
+                                    ✅ Salvar
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setEditingDescription(null)
+                                      setEditDescriptionText("")
+                                    }}
+                                    className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm"
+                                  >
+                                    ❌ Cancelar
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="mb-3">
+                                <DescriptionMessages description={ticket.descricao} />
+                                {(currentUser?.name === ticket.criado_por || currentUser?.role === "Supervisor") && (
+                                  <button
+                                    onClick={() => startEditingDescription(ticket.id, ticket.descricao)}
+                                    className="mt-2 text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                                  >
+                                    ✏️ Editar descrição
+                                  </button>
+                                )}
+                              </div>
+                            )}
+
                             <div className="flex flex-wrap gap-2 text-sm">
                               <span className="status-badge bg-blue-100 text-blue-800">
                                 {ticket.plataforma === "INTERCOM" ? "💬" : "📱"} {ticket.plataforma}
@@ -1723,7 +1809,9 @@ export default function Dashboard() {
                             <span>Auto</span>
                           </span>
                         )}
-                        <span>Última: {lastRefresh.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span>
+                          Última: {lastRefresh.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -1922,7 +2010,12 @@ export default function Dashboard() {
             {/* Tab: Usuários (apenas para Supervisor) */}
             {activeTab === "usuarios" && currentUser?.role === "Supervisor" && (
               <div className="fade-in">
-                <h2 className="text-2xl font-bold text-gray-800 mb-6">👥 Gerenciar Usuários</h2>
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-bold text-gray-800">👥 Gerenciar Usuários</h2>
+                  <button onClick={() => setShowAddUserModal(true)} className="btn-primary">
+                    ➕ Adicionar Usuário
+                  </button>
+                </div>
 
                 <div className="chart-container">
                   <div className="px-6 py-4 border-b border-gray-200">
@@ -1938,6 +2031,7 @@ export default function Dashboard() {
                           <div>
                             <h4 className="text-sm font-medium text-gray-800">{user.name}</h4>
                             <p className="text-sm text-gray-600">@{user.username}</p>
+                            {user.email && <p className="text-xs text-gray-500">{user.email}</p>}
                           </div>
                         </div>
                         <div className="flex items-center space-x-4">
@@ -1957,16 +2051,27 @@ export default function Dashboard() {
                           <div className="text-sm text-gray-500">
                             {tickets.filter((t) => t.criado_por === user.name).length} tickets
                           </div>
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => openEditUserModal(user)}
+                              className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs"
+                              title="Editar usuário"
+                            >
+                              ✏️ Editar
+                            </button>
+                            <button
+                              onClick={() => handleDeleteUser(user)}
+                              className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-xs"
+                              title="Excluir usuário"
+                              disabled={user.id === currentUser?.id}
+                            >
+                              🗑️ Excluir
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ))}
                   </div>
-                </div>
-
-                <div className="mt-6">
-                  <button onClick={() => setShowAddUserModal(true)} className="btn-primary">
-                    ➕ Adicionar Usuário
-                  </button>
                 </div>
               </div>
             )}
@@ -1979,15 +2084,16 @@ export default function Dashboard() {
             <h2 className="text-xl font-bold text-gray-800">📊 Métricas do Dia</h2>
             <div className="flex items-center space-x-4">
               <div className="text-sm text-gray-600 bg-emerald-100 px-3 py-1 rounded-full">
-                📅 {new Date().toLocaleDateString('pt-BR', { 
-                  weekday: 'long', 
-                  year: 'numeric', 
-                  month: 'long', 
-                  day: 'numeric' 
+                📅{" "}
+                {new Date().toLocaleDateString("pt-BR", {
+                  weekday: "long",
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
                 })}
               </div>
               <div className="flex items-center space-x-2">
-                <button 
+                <button
                   onClick={refreshData}
                   className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded hover:bg-blue-200 transition-colors"
                   title="Atualizar dados"
@@ -2001,7 +2107,7 @@ export default function Dashboard() {
                       <span>Auto</span>
                     </span>
                   )}
-                  <span>Última: {lastRefresh.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                  <span>Última: {lastRefresh.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
                 </div>
               </div>
             </div>
@@ -2018,9 +2124,7 @@ export default function Dashboard() {
                 {filteredTickets.length !== visibleTickets.length && (
                   <p className="text-xs text-gray-500">{visibleTickets.length} total</p>
                 )}
-                <p className="text-xs text-emerald-600 mt-1">
-                  📊 {todayTickets.length} de hoje
-                </p>
+                <p className="text-xs text-emerald-600 mt-1">📊 {todayTickets.length} de hoje</p>
               </div>
               <span className="text-3xl">📊</span>
             </div>
@@ -2145,6 +2249,18 @@ export default function Dashboard() {
                   </div>
 
                   <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">📧 Email (Opcional)</label>
+                    <input
+                      type="email"
+                      value={newUser.email}
+                      onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                      className="form-input"
+                      placeholder="Ex: joao@empresa.com"
+                      disabled={loading}
+                    />
+                  </div>
+
+                  <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">👑 Função</label>
                     <select
                       value={newUser.role}
@@ -2226,129 +2342,278 @@ export default function Dashboard() {
             </div>
           </div>
         )}
-      </div>
 
-      {/* Modal Adicionar Usuário */}
-      {showAddUserModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold text-gray-800">➕ Adicionar Novo Usuário</h3>
-                <button onClick={closeAddUserModal} className="text-gray-400 hover:text-gray-600 text-2xl">
-                  ✕
-                </button>
-              </div>
-
-              <form onSubmit={handleAddUser} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">👤 Nome Completo</label>
-                  <input
-                    type="text"
-                    value={newUser.name}
-                    onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
-                    className="form-input"
-                    placeholder="Ex: João Silva"
-                    required
-                    disabled={loading}
-                  />
+        {/* Modal Editar Usuário */}
+        {showEditUserModal && editingUser && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-xl font-bold text-gray-800">✏️ Editar Usuário</h3>
+                  <button onClick={closeEditUserModal} className="text-gray-400 hover:text-gray-600 text-2xl">
+                    ✕
+                  </button>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">🔑 Nome de Usuário</label>
-                  <input
-                    type="text"
-                    value={newUser.username}
-                    onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
-                    className="form-input"
-                    placeholder="Ex: joao.silva"
-                    required
-                    disabled={loading}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">👑 Função</label>
-                  <select
-                    value={newUser.role}
-                    onChange={(e) => setNewUser({ ...newUser, role: e.target.value as "Supervisor" | "Tecnico" })}
-                    className="form-input"
-                    disabled={loading}
-                  >
-                    <option value="Tecnico">🛠️ Técnico</option>
-                    <option value="Supervisor">👑 Supervisor</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">🏢 Departamento</label>
-                  <select
-                    value={newUser.department}
-                    onChange={(e) => setNewUser({ ...newUser, department: e.target.value })}
-                    className="form-input"
-                    required
-                    disabled={loading}
-                  >
-                    <option value="">Selecione um departamento</option>
-                    {departamentos.map((dept) => (
-                      <option key={dept} value={dept}>
-                        {getDepartmentEmoji(dept)} {dept}
-                      </option>
-                    ))}
-                    <option value="Geral">🏢 Geral</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">🔒 Senha</label>
-                  <input
-                    type="password"
-                    value={newUser.password}
-                    onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                    className="form-input"
-                    placeholder="Mínimo 6 caracteres"
-                    required
-                    disabled={loading}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">🔒 Confirmar Senha</label>
-                  <input
-                    type="password"
-                    value={newUser.confirmPassword}
-                    onChange={(e) => setNewUser({ ...newUser, confirmPassword: e.target.value })}
-                    className="form-input"
-                    placeholder="Digite a senha novamente"
-                    required
-                    disabled={loading}
-                  />
-                </div>
-
-                {addUserError && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-                    ❌ {addUserError}
+                <form onSubmit={handleEditUser} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">👤 Nome Completo</label>
+                    <input
+                      type="text"
+                      value={editUserForm.name}
+                      onChange={(e) => setEditUserForm({ ...editUserForm, name: e.target.value })}
+                      className="form-input"
+                      placeholder="Ex: João Silva"
+                      required
+                      disabled={loading}
+                    />
                   </div>
-                )}
 
-                <div className="flex space-x-3 pt-4">
-                  <button type="submit" className="btn-primary flex-1" disabled={loading}>
-                    {loading ? "🔄 Adicionando..." : "✅ Adicionar Usuário"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={closeAddUserModal}
-                    className="btn-secondary flex-1"
-                    disabled={loading}
-                  >
-                    ❌ Cancelar
-                  </button>
-                </div>
-              </form>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">🔑 Nome de Usuário</label>
+                    <input
+                      type="text"
+                      value={editUserForm.username}
+                      onChange={(e) => setEditUserForm({ ...editUserForm, username: e.target.value })}
+                      className="form-input"
+                      placeholder="Ex: joao.silva"
+                      required
+                      disabled={loading}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">📧 Email (Opcional)</label>
+                    <input
+                      type="email"
+                      value={editUserForm.email}
+                      onChange={(e) => setEditUserForm({ ...editUserForm, email: e.target.value })}
+                      className="form-input"
+                      placeholder="Ex: joao@empresa.com"
+                      disabled={loading}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">👑 Função</label>
+                    <select
+                      value={editUserForm.role}
+                      onChange={(e) =>
+                        setEditUserForm({ ...editUserForm, role: e.target.value as "Supervisor" | "Tecnico" })
+                      }
+                      className="form-input"
+                      disabled={loading || editingUser.id === currentUser?.id}
+                    >
+                      <option value="Tecnico">🛠️ Técnico</option>
+                      <option value="Supervisor">👑 Supervisor</option>
+                    </select>
+                    {editingUser.id === currentUser?.id && (
+                      <p className="text-xs text-gray-500 mt-1">Você não pode alterar sua própria função</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">🏢 Departamento</label>
+                    <select
+                      value={editUserForm.department}
+                      onChange={(e) => setEditUserForm({ ...editUserForm, department: e.target.value })}
+                      className="form-input"
+                      required
+                      disabled={loading}
+                    >
+                      <option value="">Selecione um departamento</option>
+                      {departamentos.map((dept) => (
+                        <option key={dept} value={dept}>
+                          {getDepartmentEmoji(dept)} {dept}
+                        </option>
+                      ))}
+                      <option value="Geral">🏢 Geral</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">🔒 Nova Senha (Opcional)</label>
+                    <input
+                      type="password"
+                      value={editUserForm.password}
+                      onChange={(e) => setEditUserForm({ ...editUserForm, password: e.target.value })}
+                      className="form-input"
+                      placeholder="Deixe em branco para manter a atual"
+                      disabled={loading}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">🔒 Confirmar Nova Senha</label>
+                    <input
+                      type="password"
+                      value={editUserForm.confirmPassword}
+                      onChange={(e) => setEditUserForm({ ...editUserForm, confirmPassword: e.target.value })}
+                      className="form-input"
+                      placeholder="Confirme a nova senha"
+                      disabled={loading}
+                    />
+                  </div>
+
+                  {editUserError && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                      ❌ {editUserError}
+                    </div>
+                  )}
+
+                  <div className="flex space-x-3 pt-4">
+                    <button type="submit" className="btn-primary flex-1" disabled={loading}>
+                      {loading ? "🔄 Salvando..." : "💾 Salvar Alterações"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closeEditUserModal}
+                      className="btn-secondary flex-1"
+                      disabled={loading}
+                    >
+                      ❌ Cancelar
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* Modal de Perfil */}
+        {showProfileModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="glass-effect rounded-xl shadow-2xl border border-white/20 max-w-md w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-gray-800">👤 Meu Perfil</h2>
+                  <button onClick={closeProfileModal} className="text-gray-500 hover:text-gray-700 text-xl">
+                    ✕
+                  </button>
+                </div>
+
+                {/* Avatar Section */}
+                <div className="mb-6 text-center">
+                  <div className="relative inline-block">
+                    <img
+                      src={avatarPreview || currentUser?.avatar || "/placeholder-user.jpg"}
+                      alt="Avatar"
+                      className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg"
+                    />
+                    <label className="absolute bottom-0 right-0 bg-blue-500 text-white rounded-full p-2 cursor-pointer hover:bg-blue-600 transition-colors">
+                      📷
+                      <input type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
+                    </label>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-2">Clique na câmera para alterar a foto</p>
+                </div>
+
+                {/* Formulário de Perfil */}
+                <form onSubmit={handleUpdateProfile} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">👤 Nome</label>
+                    <input
+                      type="text"
+                      value={profileForm.name}
+                      onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+                      className="form-input"
+                      required
+                      disabled={loading}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">📧 Email</label>
+                    <input
+                      type="email"
+                      value={profileForm.email}
+                      onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
+                      className="form-input"
+                      disabled={loading}
+                    />
+                  </div>
+
+                  {profileSuccess && (
+                    <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
+                      ✅ {profileSuccess}
+                    </div>
+                  )}
+
+                  {profileError && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                      ❌ {profileError}
+                    </div>
+                  )}
+
+                  <div className="flex space-x-3 pt-4">
+                    <button type="submit" className="btn-primary flex-1" disabled={loading || uploadingAvatar}>
+                      {loading || uploadingAvatar ? "🔄 Salvando..." : "💾 Salvar Perfil"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closeProfileModal}
+                      className="btn-secondary flex-1"
+                      disabled={loading}
+                    >
+                      ❌ Cancelar
+                    </button>
+                  </div>
+                </form>
+
+                {/* Separador */}
+                <div className="my-6 border-t border-gray-200"></div>
+
+                {/* Formulário de Alteração de Senha */}
+                <form onSubmit={handleChangePassword} className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">🔒 Alterar Senha</h3>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">🔑 Senha Atual</label>
+                    <input
+                      type="password"
+                      value={profileForm.currentPassword}
+                      onChange={(e) => setProfileForm({ ...profileForm, currentPassword: e.target.value })}
+                      className="form-input"
+                      required
+                      disabled={loading}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">🔑 Nova Senha</label>
+                    <input
+                      type="password"
+                      value={profileForm.newPassword}
+                      onChange={(e) => setProfileForm({ ...profileForm, newPassword: e.target.value })}
+                      className="form-input"
+                      placeholder="Mínimo 6 caracteres"
+                      required
+                      disabled={loading}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">🔑 Confirmar Nova Senha</label>
+                    <input
+                      type="password"
+                      value={profileForm.confirmPassword}
+                      onChange={(e) => setProfileForm({ ...profileForm, confirmPassword: e.target.value })}
+                      className="form-input"
+                      placeholder="Digite a nova senha novamente"
+                      required
+                      disabled={loading}
+                    />
+                  </div>
+
+                  <button type="submit" className="btn-primary w-full" disabled={loading}>
+                    {loading ? "🔄 Alterando..." : "🔒 Alterar Senha"}
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
 
       <style jsx>{`
         .login-container {
@@ -2604,6 +2869,51 @@ export default function Dashboard() {
           to { opacity: 1; transform: translateY(0); }
         }
 
+        .messages-container {
+          max-height: 300px;
+          overflow-y: auto;
+          space-y: 12px;
+        }
+
+        .message-block {
+          margin-bottom: 12px;
+          padding: 12px 16px;
+          border-radius: 12px;
+          position: relative;
+          max-width: 85%;
+        }
+
+        .system-message {
+          background: linear-gradient(135deg, #e0f2fe, #f0f9ff);
+          border: 1px solid #bae6fd;
+          margin-left: 0;
+          margin-right: auto;
+        }
+
+        .user-message {
+          background: linear-gradient(135deg, #f0fdf4, #ecfdf5);
+          border: 1px solid #bbf7d0;
+          margin-left: auto;
+          margin-right: 0;
+        }
+
+        .message-content {
+          font-size: 14px;
+          line-height: 1.5;
+          color: #374151;
+        }
+
+        .message-line {
+          margin-bottom: 4px;
+        }
+
+        .message-timestamp {
+          font-size: 10px;
+          color: #9ca3af;
+          text-align: right;
+          margin-top: 8px;
+        }
+
         .form-input {
           width: 100%;
           padding: 12px 16px;
@@ -2677,6 +2987,10 @@ export default function Dashboard() {
           .tab-button {
             font-size: 14px;
             padding: 12px 0;
+          }
+
+          .message-block {
+            max-width: 95%;
           }
         }
       `}</style>
