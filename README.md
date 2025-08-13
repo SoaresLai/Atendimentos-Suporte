@@ -17,7 +17,7 @@ Sistema de acompanhamento e gerenciamento de tickets de suporte integrado com Su
 ### Mensagens Automáticas
 
 #### Mensagem Inicial (ao criar ticket)
-```
+\`\`\`
 Você está na fila para atendimento com o Time de Suporte Groner.
 
 Atualmente, estamos ajudando outros clientes que entraram antes, mas assim que chegar sua vez o [Nome do Analista] vai falar com você.
@@ -32,15 +32,15 @@ Atualmente, estamos ajudando outros clientes que entraram antes, mas assim que c
 ---
 
 [Descrição original do ticket]
-```
+\`\`\`
 
 #### Mensagem de Início de Atendimento
-```
+\`\`\`
 ✅ Seu atendimento com o Time de Suporte Groner foi iniciado!
 Eu sou o [Nome do Analista] e vou acompanhar sua solicitação.
 
 Temos até [X] horas para concluir a resolução do seu problema. Para aproveitar ao máximo esse tempo, poderia confirmar ou complementar as informações que já nos enviou? Assim conseguimos agir de forma mais rápida e eficiente. 😉
-```
+\`\`\`
 
 **Tempo por Departamento:**
 - **Engenharia**: 8 horas
@@ -54,11 +54,11 @@ Execute o script `scripts/create-tables.sql` para criar as tabelas com todos os 
 ### Migração de Instalação Existente
 Se você já tem uma instalação existente, execute os scripts de migração:
 
-```sql
+\`\`\`sql
 -- Execute no seu banco Supabase
 \i scripts/migrate-add-ticket-id.sql
 \i scripts/migrate-add-attendance-status.sql
-```
+\`\`\`
 
 ## Estrutura do Banco
 
