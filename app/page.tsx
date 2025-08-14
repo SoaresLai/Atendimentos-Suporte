@@ -1218,7 +1218,7 @@ export default function Dashboard() {
 
                 {/* Dropdown com informações do usuário */}
                 {showHeaderInfo && (
-                  <div className="absolute right-0 top-9 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
+                  <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
                     <div className="p-4">
                       <div className="flex items-center space-x-3 mb-4">
                         {currentUser?.avatar ? (
@@ -1976,7 +1976,7 @@ export default function Dashboard() {
                                   <span className="font-medium text-gray-800">🏢 {ticket.empresa}</span>
                                   {ticket.em_implementacao && <span className="text-orange-500">⚙️</span>}
                                 </div>
-                                <p className="text-sm text-gray-600 truncate">{ticket.descricao}</p>
+                                <p className="text-sm text-gray-600 ticket-recent-description">{ticket.descricao}</p>
                               </div>
                               <div className="ml-4 text-right">
                                 <span className={cn("status-badge", getStatusColor(ticket.status))}>
@@ -2992,6 +2992,52 @@ export default function Dashboard() {
           .message-block {
             max-width: 95%;
           }
+        }
+
+        .ticket-description {
+          word-wrap: break-word;
+          word-break: break-word;
+          overflow-wrap: break-word;
+          max-width: 100%;
+          white-space: pre-wrap;
+        }
+
+        .message-content {
+          font-size: 14px;
+          line-height: 1.5;
+          color: #374151;
+          word-wrap: break-word;
+          word-break: break-word;
+          overflow-wrap: break-word;
+          max-width: 100%;
+        }
+
+        .chart-container {
+          background: rgba(255, 255, 255, 0.95);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 16px;
+          padding: 24px;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+          overflow: hidden;
+        }
+
+        .chart-container * {
+          max-width: 100%;
+          overflow-wrap: break-word;
+        }
+
+        /* Corrigir overflow em tickets recentes */
+        .ticket-recent-description {
+          word-wrap: break-word;
+          word-break: break-word;
+          overflow-wrap: break-word;
+          max-width: 100%;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
         }
       `}</style>
     </div>
